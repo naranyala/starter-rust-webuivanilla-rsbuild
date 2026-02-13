@@ -1,0 +1,64 @@
+[package]
+name = "rustwebui-app"
+version = "1.0.0"
+edition = "2024"
+
+[dependencies]
+webui-rs = { git = "https://github.com/webui-dev/rust-webui", branch = "main" }
+log = "0.4"
+env_logger = "0.11"
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+async-trait = "0.1"
+simple_logger = "5.0"
+lazy_static = "1.4"
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
+notify = "6.1"
+dirs = "5.0"
+clipboard = "0.5"
+sysinfo = "0.30"
+reqwest = { version = "0.12", features = ["json"] }
+tokio = { version = "1.0", features = ["rt-multi-thread", "macros"] }
+
+# Enhanced system utilities
+indicatif = "0.17"
+rayon = "1.10"
+arboard = "3.4"
+nix = { version = "0.29", optional = true }
+anyhow = "1.0"
+thiserror = "1.0"
+directories = "5.0"
+confy = "0.6"
+ping = "0.5"
+speedtest-rs = "0.2"
+trust-dns-resolver = "0.23"
+tao = "0.28"
+wry = "0.42"
+human-panic = "2.0"
+tray-item = { version = "0.9", features = ["ksni"] }
+walkdir = "2.5"
+rand = "0.8"
+
+[features]
+default = ["unix-systems"]
+unix-systems = ["nix"]
+native-dialogs = []
+
+[build-dependencies]
+cc = "1.0"
+walkdir = "2.3"
+toml = "0.8"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+
+[package.metadata.wix]
+category = "Application"
+description = "Rust WebUI Application"
+
+[profile.dev]
+debug = false
