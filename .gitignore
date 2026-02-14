@@ -1,7 +1,39 @@
-
+# Build artifacts
 target/
 dist/
 static/
-
-frontend/node_modules
 frontend/dist
+frontend-origin/
+logs/
+*.log
+*.log.*
+
+# Dependencies
+node_modules/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets - NEVER commit these
+*.pem
+*.key
+*.crt
+*.pfx
+.env
+.env.*
+!.env.example
+
+# Rust
+Cargo.lock
+*.rs.bk
+
+# Backup
+*.bak
+*.backup

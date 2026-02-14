@@ -2,15 +2,16 @@
 use std::sync::{Arc, Mutex};
 use crate::core::ports::repository::UserRepository;
 use crate::core::services::user_service::{UserService, UserServiceImpl};
+use crate::core::ports::logger::LogLevel;
 use crate::infrastructure::config::AppConfig;
-use crate::infrastructure::logging::SimpleLogger;
+use crate::infrastructure::logging::StructuredLogger;
 use crate::infrastructure::persistence::sqlite::user_repository::SqliteUserRepository;
 
 pub struct ServiceProvider {
     pub config: AppConfig,
     pub user_repository: Arc<dyn UserRepository>,
     pub user_service: Arc<dyn UserService>,
-    pub logger: Arc<SimpleLogger>,
+    pub logger: Arc<StructuredLogger>,
 }
 
 impl ServiceProvider {
@@ -28,8 +29,7 @@ impl ServiceProvider {
             let repo = user_repository.clone();
             let runtime = tokio::runtime::Runtime::new()?;
             runtime.block_on(async {
-                // Initialize via a simple query
-                let _ = repo.get_all().await; // This will fail if table doesn't exist
+                let _ = repo.get_all().await;
             });
         }
         
@@ -38,7 +38,9 @@ impl ServiceProvider {
         sqlite_repo.init_schema()?;
 
         // Create logger
-        let logger = Arc::new(SimpleLogger::new());
+        let log_level = LogLevel::from(config.logging.level.as_str());
+        let mut logger = StructuredLogger::new(log_level, "app");
+        logger.init(None)?;
 
         // Create event bus (noop for now)
         let event_bus = Arc::new(NoopEventBus);
@@ -51,7 +53,7 @@ impl ServiceProvider {
             config,
             user_repository,
             user_service,
-            logger,
+            logger: Arc::new(logger),
         })
     }
 }

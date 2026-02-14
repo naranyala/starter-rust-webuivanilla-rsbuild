@@ -1,49 +1,113 @@
 // Import the App class
 import { App } from './App';
+import { logger, consoleX, LogLevel, errorModal } from './lib';
+import { setContentSecurityPolicy } from './lib/security';
 
-// Add error handling for debugging
-console.log('=== Vanilla TypeScript Application Starting ===');
-console.log('Current URL:', window.location.href);
-console.log('Document readyState:', document.readyState);
+// Configure CSP in production
+if (!import.meta.env.DEV) {
+  setContentSecurityPolicy();
+}
+
+// Configure logger based on environment
+logger.setLevel(import.meta.env.DEV ? LogLevel.DEBUG : LogLevel.INFO);
+
+consoleX.title('Vanilla TypeScript Application');
+consoleX.info('Starting application...');
+consoleX.dim(`Environment: ${import.meta.env.MODE}`);
+consoleX.dim(`Timestamp: ${new Date().toISOString()}`);
 
 try {
-  // Initialize the application when DOM is loaded
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initializeApp);
   } else {
-    // Document is already loaded, initialize immediately
     initializeApp();
   }
 } catch (error) {
-  console.error('Fatal error initializing application:', error);
-  document.body.innerHTML = `<div style="padding: 20px; color: red;">Error: ${(error as Error).message}</div>`;
+  consoleX.error('Fatal error', (error as Error).message);
+  logger.error('Application initialization failed', { error: (error as Error).message });
+  errorModal.show({
+    type: 'error',
+    title: 'Application Failed to Start',
+    message: 'An unexpected error occurred during application initialization.',
+    details: (error as Error).message,
+    stack: (error as Error).stack,
+    actions: [
+      {
+        label: 'Reload',
+        primary: true,
+        onClick: () => window.location.reload(),
+      },
+      {
+        label: 'View Details',
+        onClick: () => {},
+      },
+    ],
+  });
 }
 
 function initializeApp() {
+  consoleX.step('Initializing application');
+  
   const rootElement = document.getElementById('app');
-  console.log('Root element found:', rootElement);
-
+  
   if (rootElement) {
-    // Clear the root element
+    consoleX.info('Root element found');
     rootElement.innerHTML = '';
     
-    // Create and mount the app
     const app = new App(rootElement);
     app.mount();
     
-    console.log('Vanilla TypeScript app mounted');
+    consoleX.success('Application mounted');
+    logger.info('Application started successfully', {
+      userAgent: navigator.userAgent,
+      screenSize: `${window.innerWidth}x${window.innerHeight}`,
+    });
   } else {
-    console.error('Root element #app not found!');
-    document.body.innerHTML = '<div style="padding: 20px; color: red;">Error: Root element #app not found</div>';
+    consoleX.error('Root element #app not found');
+    logger.error('Failed to find root element');
+    errorModal.show({
+      type: 'error',
+      title: 'Application Error',
+      message: 'Root element #app not found in the document.',
+      details: 'The application requires an element with id="app" to render.',
+    });
   }
 }
 
-// Global error handler
+// Global error handlers
 window.onerror = function(msg, url, lineNo, columnNo, error) {
-  console.error('Global error:', msg, 'at', url, lineNo, columnNo, error);
+  consoleX.error('Global error', `${msg} at ${url}:${lineNo}:${columnNo}`);
+  logger.error('Unhandled error', { 
+    message: msg, 
+    url, 
+    line: lineNo, 
+    column: columnNo,
+    stack: error?.stack 
+  });
+  
+  errorModal.show({
+    type: 'error',
+    title: 'Unexpected Error',
+    message: 'An unexpected error occurred in the application.',
+    details: `${msg} at ${url}:${lineNo}:${columnNo}`,
+    stack: error?.stack,
+  });
+  
   return false;
 };
 
 window.addEventListener('unhandledrejection', function(event) {
-  console.error('Unhandled promise rejection:', event.reason);
+  consoleX.error('Unhandled rejection', event.reason);
+  logger.error('Unhandled promise rejection', { reason: event.reason });
+  
+  errorModal.show({
+    type: 'error',
+    title: 'Unhandled Promise Rejection',
+    message: 'A promise was rejected but not handled.',
+    details: String(event.reason),
+  });
+});
+
+window.addEventListener('unload', function() {
+  logger.info('Application shutting down');
 });

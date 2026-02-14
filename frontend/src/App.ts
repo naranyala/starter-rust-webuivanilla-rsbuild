@@ -1,6 +1,9 @@
 // frontend/src/App.ts
 // Vanilla TypeScript implementation of the application
 
+import { escapeHtml, sanitizeUserInput } from './lib/security';
+import { errorModal } from './lib/error-modal';
+
 interface WindowInfo {
   id: string;
   title: string;
@@ -70,6 +73,38 @@ export class App {
         tags: ['Database', 'Mockup'],
         action: () => this.openSQLiteWindow(),
       },
+      {
+        id: 'calculator-card',
+        icon: '🧮',
+        title: 'Calculator',
+        description: 'Simple calculator application running in a winbox window.',
+        tags: ['Utility', 'Calculator'],
+        action: () => this.openCalculatorWindow(),
+      },
+      {
+        id: 'text-editor-card',
+        icon: '📝',
+        title: 'Text Editor',
+        description: 'Basic text editor with save and load functionality.',
+        tags: ['Productivity', 'Editor'],
+        action: () => this.openTextEditorWindow(),
+      },
+      {
+        id: 'image-viewer-card',
+        icon: '🖼️',
+        title: 'Image Viewer',
+        description: 'Simple image viewer with zoom and navigation controls.',
+        tags: ['Media', 'Viewer'],
+        action: () => this.openImageViewerWindow(),
+      },
+      {
+        id: 'terminal-card',
+        icon: '⌨️',
+        title: 'Terminal Emulator',
+        description: 'Basic terminal emulator interface with command history.',
+        tags: ['Development', 'Terminal'],
+        action: () => this.openTerminalWindow(),
+      },
     ];
   }
 
@@ -86,7 +121,47 @@ export class App {
     this.setupEventListeners();
     this.setupWindowResizeHandler();
     this.setupBackendCallbacks();
+    this.setupErrorHandlers();
   }
+
+  private setupErrorHandlers(): void {
+    this.showError = (config) => {
+      errorModal.show({
+        type: 'error',
+        title: config.title || 'Error',
+        message: config.message,
+        details: config.details,
+        stack: config.stack,
+      });
+    };
+
+    this.showWarning = (config) => {
+      errorModal.show({
+        type: 'warning',
+        title: config.title || 'Warning',
+        message: config.message,
+        details: config.details,
+      });
+    };
+
+    this.showInfo = (config) => {
+      errorModal.show({
+        type: 'info',
+        title: config.title || 'Information',
+        message: config.message,
+        details: config.details,
+      });
+    };
+
+    this.confirm = (message, onConfirm, onCancel) => {
+      errorModal.confirm(message, onConfirm, onCancel);
+    };
+  }
+
+  private showError!: (config: { title?: string; message: string; details?: string; stack?: string }) => void;
+  private showWarning!: (config: { title?: string; message: string; details?: string }) => void;
+  private showInfo!: (config: { title?: string; message: string; details?: string }) => void;
+  private confirm!: (message: string, onConfirm: () => void, onCancel?: () => void) => void;
 
   private render() {
     this.rootElement.innerHTML = this.getAppHTML();
@@ -121,6 +196,17 @@ export class App {
           </div>
 
           <div class="sidebar-footer" id="sidebar-footer">
+            <div class="demo-buttons">
+              <button id="demo-error-btn" class="demo-btn" title="Demo Error Modal">
+                Demo Error
+              </button>
+              <button id="demo-warning-btn" class="demo-btn demo-btn-warning" title="Demo Warning Modal">
+                Demo Warning
+              </button>
+              <button id="demo-confirm-btn" class="demo-btn demo-btn-info" title="Demo Confirm Modal">
+                Demo Confirm
+              </button>
+            </div>
             ${this.activeWindows.length > 0 ? `
               <button id="close-all-btn" class="close-all-btn">
                 Close All
@@ -340,8 +426,45 @@ export class App {
       }
 
       .sidebar-footer {
-        padding: 0.75rem;
-        border-top: 1px solid #334155;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 16px;
+        border-top: 1px solid #374151;
+        background: #1f2937;
+      }
+
+      .demo-buttons {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .demo-btn {
+        flex: 1;
+        min-width: 80px;
+        padding: 8px 12px;
+        border: none;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: #dc2626;
+        color: white;
+      }
+
+      .demo-btn:hover {
+        opacity: 0.9;
+        transform: translateY(-1px);
+      }
+
+      .demo-btn-warning {
+        background: #d97706;
+      }
+
+      .demo-btn-info {
+        background: #2563eb;
       }
 
       .close-all-btn {
@@ -514,6 +637,50 @@ export class App {
         left: -9999px !important;
       }
 
+      /* Enhanced WinBox styling */
+      .winbox {
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      }
+
+      .winbox .wb-header {
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 8px 12px;
+        height: 40px;
+      }
+
+      .winbox .wb-body {
+        background: #1e293b;
+        overflow: hidden;
+      }
+
+      .winbox .wb-control {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+        margin-left: 4px;
+        width: 24px;
+        height: 24px;
+        line-height: 24px;
+        font-size: 14px;
+      }
+
+      .winbox .wb-control:hover {
+        background: rgba(255, 255, 255, 0.2);
+      }
+
+      .winbox .wb-title {
+        font-size: 14px;
+        font-weight: 500;
+        color: white;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+      }
+
+      .winbox .wb-body iframe {
+        border: none;
+      }
+
       @media (max-width: 768px) {
         .app {
           flex-direction: column;
@@ -568,6 +735,38 @@ export class App {
     document.addEventListener('click', (e) => {
       if ((e.target as HTMLElement).id === 'close-all-btn') {
         this.closeAllWindows();
+      }
+      
+      // Demo error modal button
+      if ((e.target as HTMLElement).id === 'demo-error-btn') {
+        this.showError({
+          title: 'Demo Error Modal',
+          message: 'This is a demonstration of the error modal system.',
+          details: 'Error code: DEMO_ERROR_001\nFile: demo.ts:42',
+          stack: new Error('Demo error').stack,
+        });
+      }
+      
+      // Demo warning modal button
+      if ((e.target as HTMLElement).id === 'demo-warning-btn') {
+        this.showWarning({
+          title: 'Demo Warning Modal',
+          message: 'This is a demonstration of the warning modal system.',
+          details: 'Warning: This action may have unintended consequences.',
+        });
+      }
+      
+      // Demo confirm modal button
+      if ((e.target as HTMLElement).id === 'demo-confirm-btn') {
+        this.confirm(
+          'Are you sure you want to proceed with this action?',
+          () => {
+            errorModal.success('Action confirmed!', 'The action was completed successfully.');
+          },
+          () => {
+            errorModal.info('Action cancelled', 'You chose to cancel the action.');
+          }
+        );
       }
     });
 
@@ -847,17 +1046,533 @@ export class App {
     const tableBody = document.getElementById('users-table-body');
     if (!tableBody || this.dbUsers.length === 0) return;
 
-    const rows = this.dbUsers.map((row: User) => `
-      <tr style="border-bottom: 1px solid #334155;">
-        <td style="padding: 10px; color: #e2e8f0;">${row.id}</td>
-        <td style="padding: 10px; color: #e2e8f0;">${row.name}</td>
-        <td style="padding: 10px; color: #94a3b8;">${row.email}</td>
-        <td style="padding: 10px;"><span style="background: ${row.role === 'Admin' ? '#dc2626' : row.role === 'Editor' ? '#f59e0b' : '#3b82f6'}; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">${row.role}</span></td>
-        <td style="padding: 10px;"><span style="color: ${row.status === 'Active' ? '#10b981' : row.status === 'Inactive' ? '#ef4444' : '#f59e0b'}">● ${row.status}</span></td>
-      </tr>
-    `).join('');
+    tableBody.innerHTML = '';
 
-    tableBody.innerHTML = rows;
+    for (const row of this.dbUsers) {
+      const tr = document.createElement('tr');
+      tr.style.borderBottom = '1px solid #334155';
+
+      const idCell = document.createElement('td');
+      idCell.style.padding = '10px';
+      idCell.style.color = '#e2e8f0';
+      idCell.textContent = String(row.id);
+      tr.appendChild(idCell);
+
+      const nameCell = document.createElement('td');
+      nameCell.style.padding = '10px';
+      nameCell.style.color = '#e2e8f0';
+      nameCell.textContent = row.name;
+      tr.appendChild(nameCell);
+
+      const emailCell = document.createElement('td');
+      emailCell.style.padding = '10px';
+      emailCell.style.color = '#94a3b8';
+      emailCell.textContent = row.email;
+      tr.appendChild(emailCell);
+
+      const roleCell = document.createElement('td');
+      roleCell.style.padding = '10px';
+      const roleSpan = document.createElement('span');
+      roleSpan.style.background = row.role === 'Admin' ? '#dc2626' : row.role === 'Editor' ? '#f59e0b' : '#3b82f6';
+      roleSpan.style.padding = '2px 8px';
+      roleSpan.style.borderRadius = '4px';
+      roleSpan.style.fontSize = '0.75rem';
+      roleSpan.textContent = row.role;
+      roleCell.appendChild(roleSpan);
+      tr.appendChild(roleCell);
+
+      const statusCell = document.createElement('td');
+      statusCell.style.padding = '10px';
+      statusCell.style.color = row.status === 'Active' ? '#10b981' : row.status === 'Inactive' ? '#ef4444' : '#f59e0b';
+      statusCell.textContent = `● ${row.status}`;
+      tr.appendChild(statusCell);
+
+      tableBody.appendChild(tr);
+    }
+  }
+
+  private generateCalculatorHTML(): string {
+    return `
+      <div style="padding: 20px; color: white; font-family: 'Segoe UI', sans-serif; height: 100%; display: flex; flex-direction: column; background: #1e293b;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h2 style="color: #4f46e5;">🧮 Calculator</h2>
+        </div>
+
+        <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+          <input type="text" id="calculator-display" readonly style="width: 100%; padding: 15px; font-size: 1.5rem; text-align: right; background: #0f172a; color: white; border: 1px solid #334155; border-radius: 6px; box-sizing: border-box;">
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; flex: 1;">
+          <button onclick="calculatorClear()" style="grid-column: span 2; padding: 15px; background: #dc2626; color: white; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer;">AC</button>
+          <button onclick="calculatorDelete()" style="padding: 15px; background: #f59e0b; color: white; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer;">DEL</button>
+          <button onclick="calculatorAppend('/')" style="padding: 15px; background: #4f46e5; color: white; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer;">÷</button>
+
+          <button onclick="calculatorAppend('7')" style="padding: 15px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; font-size: 1rem; cursor: pointer;">7</button>
+          <button onclick="calculatorAppend('8')" style="padding: 15px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; font-size: 1rem; cursor: pointer;">8</button>
+          <button onclick="calculatorAppend('9')" style="padding: 15px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; font-size: 1rem; cursor: pointer;">9</button>
+          <button onclick="calculatorAppend('*')" style="padding: 15px; background: #4f46e5; color: white; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer;">×</button>
+
+          <button onclick="calculatorAppend('4')" style="padding: 15px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; font-size: 1rem; cursor: pointer;">4</button>
+          <button onclick="calculatorAppend('5')" style="padding: 15px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; font-size: 1rem; cursor: pointer;">5</button>
+          <button onclick="calculatorAppend('6')" style="padding: 15px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; font-size: 1rem; cursor: pointer;">6</button>
+          <button onclick="calculatorAppend('-')" style="padding: 15px; background: #4f46e5; color: white; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer;">-</button>
+
+          <button onclick="calculatorAppend('1')" style="padding: 15px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; font-size: 1rem; cursor: pointer;">1</button>
+          <button onclick="calculatorAppend('2')" style="padding: 15px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; font-size: 1rem; cursor: pointer;">2</button>
+          <button onclick="calculatorAppend('3')" style="padding: 15px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; font-size: 1rem; cursor: pointer;">3</button>
+          <button onclick="calculatorAppend('+')" style="padding: 15px; background: #4f46e5; color: white; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer;">+</button>
+
+          <button onclick="calculatorAppend('0')" style="grid-column: span 2; padding: 15px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; font-size: 1rem; cursor: pointer;">0</button>
+          <button onclick="calculatorAppend('.')" style="padding: 15px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; font-size: 1rem; cursor: pointer;">.</button>
+          <button onclick="calculatorCalculate()" style="padding: 15px; background: #10b981; color: white; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer;">=</button>
+        </div>
+
+        <script>
+          let calculatorDisplay = document.getElementById('calculator-display');
+          let currentInput = '0';
+          let previousInput = '';
+          let operation = null;
+          let shouldResetDisplay = false;
+
+          function updateDisplay() {
+            calculatorDisplay.value = currentInput;
+          }
+
+          function calculatorAppend(value) {
+            if (shouldResetDisplay) {
+              currentInput = '';
+              shouldResetDisplay = false;
+            }
+            
+            if (currentInput === '0' && value !== '.') {
+              currentInput = value;
+            } else {
+              currentInput += value;
+            }
+            
+            updateDisplay();
+          }
+
+          function calculatorClear() {
+            currentInput = '0';
+            previousInput = '';
+            operation = null;
+            shouldResetDisplay = false;
+            updateDisplay();
+          }
+
+          function calculatorDelete() {
+            if (currentInput.length === 1) {
+              currentInput = '0';
+            } else {
+              currentInput = currentInput.slice(0, -1);
+            }
+            updateDisplay();
+          }
+
+          function calculatorCalculate() {
+            if (operation === null || shouldResetDisplay) return;
+
+            let result;
+            const prev = parseFloat(previousInput);
+            const current = parseFloat(currentInput);
+
+            if (isNaN(prev) || isNaN(current)) return;
+
+            switch (operation) {
+              case '+':
+                result = prev + current;
+                break;
+              case '-':
+                result = prev - current;
+                break;
+              case '*':
+                result = prev * current;
+                break;
+              case '/':
+                result = prev / current;
+                break;
+              default:
+                return;
+            }
+
+            currentInput = result.toString();
+            operation = null;
+            previousInput = '';
+            shouldResetDisplay = true;
+            updateDisplay();
+          }
+
+          function calculatorSetOperation(op) {
+            if (operation !== null) calculatorCalculate();
+            
+            operation = op;
+            previousInput = currentInput;
+            shouldResetDisplay = true;
+          }
+
+          // Attach functions to window so they can be called from HTML
+          window.calculatorAppend = calculatorAppend;
+          window.calculatorClear = calculatorClear;
+          window.calculatorDelete = calculatorDelete;
+          window.calculatorCalculate = calculatorCalculate;
+          window.calculatorSetOperation = calculatorSetOperation;
+
+          // Initialize display
+          updateDisplay();
+        </script>
+      </div>
+    `;
+  }
+
+  private generateTextEditorHTML(): string {
+    return `
+      <div style="padding: 20px; color: white; font-family: 'Segoe UI', sans-serif; height: 100%; display: flex; flex-direction: column; background: #1e293b;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h2 style="color: #4f46e5;">📝 Text Editor</h2>
+          <div style="display: flex; gap: 10px;">
+            <button onclick="textEditorSave()" style="padding: 8px 16px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Save</button>
+            <button onclick="textEditorLoad()" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Load</button>
+          </div>
+        </div>
+
+        <textarea id="text-editor-content" style="flex: 1; width: 100%; padding: 15px; background: #0f172a; color: white; border: 1px solid #334155; border-radius: 8px; resize: none; font-family: monospace; font-size: 1rem; box-sizing: border-box;"></textarea>
+
+        <div style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center;">
+          <div style="color: #94a3b8; font-size: 0.8rem;">
+            <span id="cursor-position">Line: 1, Column: 1</span>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button onclick="textEditorUndo()" style="padding: 6px 12px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; cursor: pointer; font-size: 0.8rem;">Undo</button>
+            <button onclick="textEditorRedo()" style="padding: 6px 12px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; cursor: pointer; font-size: 0.8rem;">Redo</button>
+          </div>
+        </div>
+
+        <script>
+          let textEditorContent = document.getElementById('text-editor-content');
+          let undoStack = [];
+          let redoStack = [];
+
+          function saveState() {
+            undoStack.push(textEditorContent.value);
+            if (undoStack.length > 50) undoStack.shift(); // Limit stack size
+            redoStack = []; // Clear redo stack when new action is performed
+          }
+
+          function updateCursorPosition() {
+            const textarea = textEditorContent;
+            const text = textarea.value.substring(0, textarea.selectionStart);
+            const lines = text.split('\\n');
+            const line = lines.length;
+            const column = lines[lines.length - 1].length + 1;
+            document.getElementById('cursor-position').textContent = \`Line: \${line}, Column: \${column}\`;
+          }
+
+          function textEditorSave() {
+            const content = textEditorContent.value;
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'document.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          }
+
+          function textEditorLoad() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.txt,.js,.ts,.html,.css,.json,.md';
+            
+            input.onchange = e => {
+              const file = e.target.files[0];
+              const reader = new FileReader();
+              
+              reader.onload = function(e) {
+                textEditorContent.value = e.target.result;
+                saveState();
+                updateCursorPosition();
+              };
+              
+              reader.readAsText(file);
+            };
+            
+            input.click();
+          }
+
+          function textEditorUndo() {
+            if (undoStack.length > 0) {
+              redoStack.push(textEditorContent.value);
+              textEditorContent.value = undoStack.pop();
+            }
+          }
+
+          function textEditorRedo() {
+            if (redoStack.length > 0) {
+              undoStack.push(textEditorContent.value);
+              textEditorContent.value = redoStack.pop();
+            }
+          }
+
+          // Event listeners
+          textEditorContent.addEventListener('input', saveState);
+          textEditorContent.addEventListener('keyup', updateCursorPosition);
+          textEditorContent.addEventListener('click', updateCursorPosition);
+          textEditorContent.addEventListener('mousemove', updateCursorPosition);
+
+          // Initialize
+          saveState();
+          updateCursorPosition();
+
+          // Attach functions to window
+          window.textEditorSave = textEditorSave;
+          window.textEditorLoad = textEditorLoad;
+          window.textEditorUndo = textEditorUndo;
+          window.textEditorRedo = textEditorRedo;
+        </script>
+      </div>
+    `;
+  }
+
+  private generateImageViewerHTML(): string {
+    return `
+      <div style="padding: 20px; color: white; font-family: 'Segoe UI', sans-serif; height: 100%; display: flex; flex-direction: column; background: #1e293b;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h2 style="color: #4f46e5;">🖼️ Image Viewer</h2>
+          <div style="display: flex; gap: 10px;">
+            <button onclick="imageViewerZoomIn()" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Zoom In</button>
+            <button onclick="imageViewerZoomOut()" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Zoom Out</button>
+            <button onclick="imageViewerReset()" style="padding: 8px 16px; background: #f59e0b; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Reset</button>
+          </div>
+        </div>
+
+        <div style="flex: 1; display: flex; justify-content: center; align-items: center; background: #0f172a; border-radius: 8px; overflow: hidden; position: relative;">
+          <img id="image-viewer-img" src="https://placehold.co/600x400/1e293b/94a3b8?text=Select+an+Image+to+View" alt="Image Preview" style="max-width: 100%; max-height: 100%; object-fit: contain; transition: transform 0.2s ease;">
+        </div>
+
+        <div style="margin-top: 15px; display: flex; gap: 10px;">
+          <input type="file" id="image-upload" accept="image/*" style="display: none;" onchange="imageViewerHandleUpload()">
+          <button onclick="document.getElementById('image-upload').click()" style="flex: 1; padding: 10px; background: #8b5cf6; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Select Image</button>
+          <button onclick="imageViewerPrev()" style="padding: 10px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">← Prev</button>
+          <button onclick="imageViewerNext()" style="padding: 10px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Next →</button>
+        </div>
+
+        <script>
+          let imageView = document.getElementById('image-viewer-img');
+          let scale = 1;
+          let currentImageIndex = 0;
+          
+          // Sample images for demo
+          const sampleImages = [
+            'https://placehold.co/600x400/1e293b/94a3b8?text=Sample+Image+1',
+            'https://placehold.co/600x400/0f172a/4f46e5?text=Sample+Image+2',
+            'https://placehold.co/600x400/1e293b/f59e0b?text=Sample+Image+3',
+            'https://placehold.co/600x400/0f172a/10b981?text=Sample+Image+4'
+          ];
+
+          function imageViewerZoomIn() {
+            scale = Math.min(scale + 0.2, 3);
+            imageView.style.transform = \`scale(\${scale})\`;
+          }
+
+          function imageViewerZoomOut() {
+            scale = Math.max(scale - 0.2, 0.2);
+            imageView.style.transform = \`scale(\${scale})\`;
+          }
+
+          function imageViewerReset() {
+            scale = 1;
+            imageView.style.transform = 'scale(1)';
+          }
+
+          function imageViewerHandleUpload() {
+            const input = document.getElementById('image-upload');
+            const file = input.files[0];
+            
+            if (file) {
+              const reader = new FileReader();
+              reader.onload = function(e) {
+                imageView.src = e.target.result;
+                scale = 1;
+                imageView.style.transform = 'scale(1)';
+              };
+              reader.readAsDataURL(file);
+            }
+          }
+
+          function imageViewerPrev() {
+            currentImageIndex = (currentImageIndex - 1 + sampleImages.length) % sampleImages.length;
+            imageView.src = sampleImages[currentImageIndex];
+            scale = 1;
+            imageView.style.transform = 'scale(1)';
+          }
+
+          function imageViewerNext() {
+            currentImageIndex = (currentImageIndex + 1) % sampleImages.length;
+            imageView.src = sampleImages[currentImageIndex];
+            scale = 1;
+            imageView.style.transform = 'scale(1)';
+          }
+
+          // Attach functions to window
+          window.imageViewerZoomIn = imageViewerZoomIn;
+          window.imageViewerZoomOut = imageViewerZoomOut;
+          window.imageViewerReset = imageViewerReset;
+          window.imageViewerHandleUpload = imageViewerHandleUpload;
+          window.imageViewerPrev = imageViewerPrev;
+          window.imageViewerNext = imageViewerNext;
+        </script>
+      </div>
+    `;
+  }
+
+  private generateTerminalHTML(): string {
+    return `
+      <div style="padding: 20px; color: white; font-family: 'Courier New', monospace; height: 100%; display: flex; flex-direction: column; background: #0f172a;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h2 style="color: #4f46e5;">⌨️ Terminal Emulator</h2>
+          <div style="display: flex; gap: 10px;">
+            <button onclick="terminalClear()" style="padding: 8px 16px; background: #dc2626; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Clear</button>
+            <button onclick="terminalReset()" style="padding: 8px 16px; background: #f59e0b; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Reset</button>
+          </div>
+        </div>
+
+        <div id="terminal-output" style="flex: 1; background: #000; color: #00ff00; padding: 15px; border-radius: 8px; overflow-y: auto; font-size: 0.9rem; white-space: pre-wrap; margin-bottom: 10px; height: calc(100% - 80px);">
+          <div>Welcome to Terminal Emulator v1.0</div>
+          <div>Type 'help' for available commands</div>
+          <div style="color: #94a3b8;">$ Ready...</div>
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+          <span style="color: #94a3b8;">$</span>
+          <input type="text" id="terminal-input" style="flex: 1; background: #000; color: #00ff00; border: 1px solid #334155; border-radius: 4px; padding: 8px; font-family: 'Courier New', monospace;" placeholder="Enter command...">
+          <button onclick="terminalExecute()" style="padding: 8px 16px; background: #4f46e5; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Run</button>
+        </div>
+
+        <script>
+          let terminalOutput = document.getElementById('terminal-output');
+          let terminalInput = document.getElementById('terminal-input');
+          let commandHistory = [];
+          let historyIndex = -1;
+
+          function terminalPrint(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            terminalOutput.appendChild(div);
+            terminalOutput.scrollTop = terminalOutput.scrollHeight;
+          }
+
+          function terminalExecute() {
+            const command = terminalInput.value.trim();
+            if (!command) return;
+
+            terminalPrint('$ ' + command);
+            commandHistory.push(command);
+            historyIndex = commandHistory.length;
+
+            // Process command
+            const cmd = command.toLowerCase();
+            if (cmd === 'help') {
+              terminalPrint('Available commands:');
+              terminalPrint('  help - Show this help message');
+              terminalPrint('  clear - Clear the terminal');
+              terminalPrint('  echo [text] - Print text to terminal');
+              terminalPrint('  date - Show current date and time');
+              terminalPrint('  whoami - Show current user');
+              terminalPrint('  pwd - Show current directory');
+              terminalPrint('  ls - List directory contents');
+            } else if (cmd === 'clear') {
+              terminalClear();
+              return;
+            } else if (cmd === 'date') {
+              terminalPrint(new Date().toString());
+            } else if (cmd === 'whoami') {
+              terminalPrint('user@rust-webui:~$');
+            } else if (cmd === 'pwd') {
+              terminalPrint('/home/user');
+            } else if (cmd === 'ls') {
+              terminalPrint('Documents\\tDownloads\\tPictures\\tMusic\\tVideos');
+            } else if (cmd.startsWith('echo ')) {
+              terminalPrint(command.substring(5));
+            } else {
+              terminalPrint('Command not found: ' + command + '. Type "help" for available commands.');
+            }
+
+            terminalInput.value = '';
+          }
+
+          function terminalClear() {
+            terminalOutput.innerHTML = '';
+            terminalPrint('Terminal cleared');
+            terminalPrint('Type "help" for available commands');
+          }
+
+          function terminalReset() {
+            terminalOutput.innerHTML = '';
+            terminalPrint('Welcome to Terminal Emulator v1.0');
+            terminalPrint('Type "help" for available commands');
+            terminalPrint('$ Ready...');
+            commandHistory = [];
+            historyIndex = -1;
+          }
+
+          // Handle keyboard events
+          terminalInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+              terminalExecute();
+            } else if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              if (commandHistory.length > 0) {
+                if (historyIndex <= 0) historyIndex = commandHistory.length;
+                historyIndex--;
+                terminalInput.value = commandHistory[historyIndex];
+              }
+            } else if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              if (historyIndex >= commandHistory.length - 1) {
+                historyIndex = commandHistory.length;
+                terminalInput.value = '';
+              } else {
+                historyIndex++;
+                if (historyIndex < commandHistory.length) {
+                  terminalInput.value = commandHistory[historyIndex];
+                } else {
+                  terminalInput.value = '';
+                }
+              }
+            }
+          });
+
+          // Focus input on click anywhere in terminal
+          terminalOutput.addEventListener('click', function() {
+            terminalInput.focus();
+          });
+
+          // Attach functions to window
+          window.terminalExecute = terminalExecute;
+          window.terminalClear = terminalClear;
+          window.terminalReset = terminalReset;
+        </script>
+      </div>
+    `;
+  }
+
+  private openCalculatorWindow() {
+    this.openWindow('Calculator', this.generateCalculatorHTML(), '🧮');
+  }
+
+  private openTextEditorWindow() {
+    this.openWindow('Text Editor', this.generateTextEditorHTML(), '📝');
+  }
+
+  private openImageViewerWindow() {
+    this.openWindow('Image Viewer', this.generateImageViewerHTML(), '🖼️');
+  }
+
+  private openTerminalWindow() {
+    this.openWindow('Terminal', this.generateTerminalHTML(), '⌨️');
   }
 
   private waitForWinBox(retries: number = 10): Promise<any> {
@@ -876,7 +1591,7 @@ export class App {
     });
   }
 
-  private async openWindow(title: string, content: string, icon: string) {
+  private async openWindow(title: string, content: string, icon: string, options: any = {}) {
     if (!window.WinBox) {
       this.Logger.warn('WinBox not ready, waiting...');
       const WinBox = await this.waitForWinBox();
@@ -902,7 +1617,8 @@ export class App {
     const windowId = 'win-' + Date.now();
     let winboxInstance: any;
 
-    winboxInstance = new window.WinBox({
+    // Default options
+    const defaultOptions = {
       title: title,
       background: '#1e293b',
       border: 4,
@@ -945,7 +1661,12 @@ export class App {
         this.activeWindows = this.activeWindows.filter(w => w.id !== windowId);
         this.updateWindowList();
       }
-    });
+    };
+
+    // Merge default options with custom options
+    const winboxOptions = { ...defaultOptions, ...options };
+
+    winboxInstance = new window.WinBox(winboxOptions);
 
     const windowInfo: WindowInfo = {
       id: windowId,
@@ -957,6 +1678,58 @@ export class App {
 
     this.activeWindows.push(windowInfo);
     this.updateWindowList();
+  }
+
+  private openCalculatorWindow() {
+    this.openWindow('Calculator', this.generateCalculatorHTML(), '🧮', {
+      width: '400px',
+      height: '500px',
+      x: 'center',
+      y: 'center',
+      minwidth: '300px',
+      minheight: '400px',
+      background: '#1e293b',
+      border: 4
+    });
+  }
+
+  private openTextEditorWindow() {
+    this.openWindow('Text Editor', this.generateTextEditorHTML(), '📝', {
+      width: '800px',
+      height: '600px',
+      x: 'center',
+      y: 'center',
+      minwidth: '500px',
+      minheight: '400px',
+      background: '#1e293b',
+      border: 4
+    });
+  }
+
+  private openImageViewerWindow() {
+    this.openWindow('Image Viewer', this.generateImageViewerHTML(), '🖼️', {
+      width: '800px',
+      height: '600px',
+      x: 'center',
+      y: 'center',
+      minwidth: '600px',
+      minheight: '500px',
+      background: '#1e293b',
+      border: 4
+    });
+  }
+
+  private openTerminalWindow() {
+    this.openWindow('Terminal', this.generateTerminalHTML(), '⌨️', {
+      width: '800px',
+      height: '500px',
+      x: 'center',
+      y: 'center',
+      minwidth: '500px',
+      minheight: '400px',
+      background: '#0f172a',
+      border: 4
+    });
   }
 
   private focusWindow(windowInfo: WindowInfo) {
