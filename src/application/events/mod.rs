@@ -1,2 +1,2 @@
-// application/events/mod.rs
-// Event handlers go here
+// Application events facade mapped to MVVM viewmodels.
+pub use crate::viewmodel::viewmodels::*;

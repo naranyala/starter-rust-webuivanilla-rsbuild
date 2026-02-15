@@ -163,6 +163,20 @@ build_release() {
 run_app() {
     print_step "Running application..."
 
+    # Skip running GUI app in headless/unreachable display environments
+    if [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]; then
+        print_warning "No graphical display detected (DISPLAY/WAYLAND_DISPLAY unset)."
+        print_warning "Build succeeded, but GUI runtime is skipped in headless environment."
+        return 0
+    fi
+    if [ -n "${DISPLAY:-}" ] && command -v xdpyinfo >/dev/null 2>&1; then
+        if ! xdpyinfo -display "${DISPLAY}" >/dev/null 2>&1; then
+            print_warning "Display '${DISPLAY}' is not reachable."
+            print_warning "Build succeeded, but GUI runtime is skipped."
+            return 0
+        fi
+    fi
+
     # Determine which executable to run
     if [ -f "target/debug/app" ]; then
         print_status "Running debug version..."

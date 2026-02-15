@@ -1,7 +1,8 @@
+import 'winbox/dist/css/winbox.min.css';
+
 // Import the App class
-import { App } from './App';
-import { logger, consoleX, LogLevel, errorModal } from './lib';
-import { setContentSecurityPolicy } from './lib/security';
+import { App } from './mvvm/view';
+import { logger, consoleX, LogLevel, errorModal, setContentSecurityPolicy } from './mvvm/shared';
 
 // Configure CSP in production
 if (!import.meta.env.DEV) {

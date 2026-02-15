@@ -1,2 +1,2 @@
-// infrastructure/persistence/sqlite/mod.rs
-pub mod user_repository;
+// Compatibility re-export.
+pub use crate::model::repositories::sqlite::*;

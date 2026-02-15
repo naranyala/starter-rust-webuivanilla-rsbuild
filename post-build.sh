@@ -32,7 +32,7 @@ TARGET_BIN_RELEASE="target/release/$EXECUTABLE_NAME"
 
 # Rename debug build
 if [ -f "$SOURCE_BIN" ]; then
-    if [ "$SOURCE_BIN" != "$TARGET_BIN" ]; then
+    if [ "$SOURCE_BIN" != "$TARGET_BIN" ] && { [ ! -e "$TARGET_BIN" ] || [ ! "$SOURCE_BIN" -ef "$TARGET_BIN" ]; }; then
         echo "Renaming debug binary: $PACKAGE_NAME -> $EXECUTABLE_NAME"
         mv "$SOURCE_BIN" "$TARGET_BIN"
     else
@@ -42,7 +42,7 @@ fi
 
 # Rename release build
 if [ -f "$SOURCE_BIN_RELEASE" ]; then
-    if [ "$SOURCE_BIN_RELEASE" != "$TARGET_BIN_RELEASE" ]; then
+    if [ "$SOURCE_BIN_RELEASE" != "$TARGET_BIN_RELEASE" ] && { [ ! -e "$TARGET_BIN_RELEASE" ] || [ ! "$SOURCE_BIN_RELEASE" -ef "$TARGET_BIN_RELEASE" ]; }; then
         echo "Renaming release binary: $PACKAGE_NAME -> $EXECUTABLE_NAME"
         mv "$SOURCE_BIN_RELEASE" "$TARGET_BIN_RELEASE"
     else
@@ -52,13 +52,17 @@ fi
 
 # Also handle Windows .exe files
 if [ -f "$SOURCE_BIN.exe" ]; then
-    echo "Renaming debug binary (Windows): $PACKAGE_NAME.exe -> $EXECUTABLE_NAME.exe"
-    mv "$SOURCE_BIN.exe" "$TARGET_BIN.exe"
+    if [ "$SOURCE_BIN.exe" != "$TARGET_BIN.exe" ] && { [ ! -e "$TARGET_BIN.exe" ] || [ ! "$SOURCE_BIN.exe" -ef "$TARGET_BIN.exe" ]; }; then
+        echo "Renaming debug binary (Windows): $PACKAGE_NAME.exe -> $EXECUTABLE_NAME.exe"
+        mv "$SOURCE_BIN.exe" "$TARGET_BIN.exe"
+    fi
 fi
 
 if [ -f "$SOURCE_BIN_RELEASE.exe" ]; then
-    echo "Renaming release binary (Windows): $PACKAGE_NAME.exe -> $EXECUTABLE_NAME.exe"
-    mv "$SOURCE_BIN_RELEASE.exe" "$TARGET_BIN_RELEASE.exe"
+    if [ "$SOURCE_BIN_RELEASE.exe" != "$TARGET_BIN_RELEASE.exe" ] && { [ ! -e "$TARGET_BIN_RELEASE.exe" ] || [ ! "$SOURCE_BIN_RELEASE.exe" -ef "$TARGET_BIN_RELEASE.exe" ]; }; then
+        echo "Renaming release binary (Windows): $PACKAGE_NAME.exe -> $EXECUTABLE_NAME.exe"
+        mv "$SOURCE_BIN_RELEASE.exe" "$TARGET_BIN_RELEASE.exe"
+    fi
 fi
 
 # Verify static linking (Linux)

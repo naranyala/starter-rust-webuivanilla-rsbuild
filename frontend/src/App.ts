@@ -1,13 +1,14 @@
 // frontend/src/App.ts
 // Vanilla TypeScript implementation of the application
 
-import { escapeHtml, sanitizeUserInput } from './lib/security';
 import { errorModal } from './lib/error-modal';
+import WinBox from 'winbox/src/js/winbox.js';
 
 interface WindowInfo {
   id: string;
   title: string;
   minimized: boolean;
+  active: boolean;
   maximized?: boolean;
   winboxInstance: any;
 }
@@ -24,10 +25,22 @@ interface User {
 declare global {
   interface Window {
     WinBox: any;
+    webui?: {
+      call: (fn: string, ...args: any[]) => Promise<any>;
+      isConnected?: () => boolean;
+      setEventCallback?: (cb: (event: any) => void) => void;
+      event?: {
+        CONNECTED?: any;
+        DISCONNECTED?: any;
+      };
+    };
+    __WEBUI_WS_PORT__?: number;
     getUsers?: () => void;
     getDbStats?: () => void;
     refreshUsers?: () => void;
     searchUsers?: () => void;
+    logWindowLifecycle?: (payload: string) => void;
+    log_window_lifecycle?: (payload: string) => void;
     Logger?: {
       info: (message: string, meta?: Record<string, any>) => void;
       warn: (message: string, meta?: Record<string, any>) => void;
@@ -46,6 +59,22 @@ interface CardItem {
   action: () => void;
 }
 
+type WindowLifecycleState = 'opened' | 'focused' | 'active' | 'minimized' | 'restored' | 'closed';
+type WsConnectionState =
+  | 'initializing'
+  | 'connected'
+  | 'disconnected'
+  | 'reconnecting'
+  | 'bridge_missing'
+  | 'error';
+
+interface WindowLifecyclePayload {
+  event: WindowLifecycleState;
+  window_id: string;
+  title: string;
+  timestamp: string;
+}
+
 export class App {
   private rootElement: HTMLElement;
   private activeWindows: WindowInfo[] = [];
@@ -53,6 +82,22 @@ export class App {
   private dbStats: { users: number; tables: string[] } = { users: 0, tables: [] };
   private isLoadingUsers: boolean = false;
   private cards: CardItem[] = [];
+  private lifecycleQueue: WindowLifecyclePayload[] = [];
+  private lifecycleFlushTimer: number | null = null;
+  private lifecycleLastSent = new Map<string, { state: WindowLifecycleState; ts: number }>();
+  private lifecycleFocusTimers = new Map<string, number>();
+  private wsState: WsConnectionState = 'initializing';
+  private wsStateHistory: Array<{ state: WsConnectionState; at: string; reason?: string }> = [];
+  private wsHeartbeatTimer: number | null = null;
+  private wsReconnectAttempts = 0;
+  private wsPanelCollapsed = true;
+  private wsLastError = '';
+  private wsLastHeartbeatAt = '';
+  private wsBackendSendOk = 0;
+  private wsBackendSendFail = 0;
+  private wsBackendLastOkAt = '';
+  private wsRuntimePort: number | null = null;
+  private wsRuntimePortSource: 'injected' | 'location' | 'unknown' = 'unknown';
 
   constructor(rootElement: HTMLElement) {
     this.rootElement = rootElement;
@@ -122,6 +167,8 @@ export class App {
     this.setupWindowResizeHandler();
     this.setupBackendCallbacks();
     this.setupErrorHandlers();
+    this.startBackendBridge();
+    this.setupConnectionMonitoring();
   }
 
   private setupErrorHandlers(): void {
@@ -171,6 +218,7 @@ export class App {
 
   private getAppHTML(): string {
     return `
+      <div class="app-shell">
       <div class="app">
         <aside class="sidebar">
           <div class="home-button-container">
@@ -232,16 +280,25 @@ export class App {
           </main>
         </div>
       </div>
+      <div id="ws-status-panel" class="ws-status-panel ws-state-initializing ws-collapsed">
+        <button id="ws-status-toggle" class="ws-status-toggle" type="button">
+          <span id="ws-status-summary">WS: INITIALIZING</span>
+          <span id="ws-status-chevron">▴</span>
+        </button>
+        <div id="ws-status-details" class="ws-status-details"></div>
+      </div>
+      </div>
     `;
   }
 
   private getWindowItemHTML(window: WindowInfo): string {
+    const status = window.minimized ? 'Minimized' : window.active ? 'Active' : 'Open';
     return `
       <div class="window-item ${window.minimized ? 'minimized' : ''}" data-window-id="${window.id}">
         <div class="window-icon">📷</div>
         <div class="window-info">
           <span class="window-title">${window.title}</span>
-          <span class="window-status">${window.minimized ? 'Minimized' : 'Active'}</span>
+          <span class="window-status">${status}</span>
         </div>
         <button class="window-close" data-close-window="${window.id}" title="Close window">
           ×
@@ -267,9 +324,84 @@ export class App {
       }
 
       .app {
-        min-height: 100vh;
+        min-height: calc(100vh - 24px);
+        padding-bottom: 24px;
         display: flex;
         flex-direction: row;
+      }
+
+      .app-shell {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .ws-status-panel {
+        width: 100vw;
+        position: fixed;
+        left: 0;
+        bottom: 0;
+        z-index: 2147483647;
+        color: #e2e8f0;
+        border-top: 1px solid #475569;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      }
+
+      .ws-status-toggle {
+        appearance: none;
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        height: 24px;
+        padding: 0 10px;
+        font-size: 11px;
+        line-height: 24px;
+        cursor: pointer;
+        color: inherit;
+        background: transparent;
+      }
+
+      .ws-status-details {
+        display: none;
+        max-height: 160px;
+        overflow-y: auto;
+        border-top: 1px solid rgba(255, 255, 255, 0.15);
+        padding: 6px 10px 8px;
+        font-size: 10px;
+        line-height: 1.4;
+        white-space: pre-wrap;
+      }
+
+      .ws-status-panel.ws-expanded .ws-status-details {
+        display: block;
+      }
+
+      .ws-status-panel.ws-collapsed #ws-status-chevron {
+        transform: rotate(180deg);
+      }
+
+      .ws-status-panel.ws-state-initializing,
+      .ws-status-panel.ws-state-reconnecting {
+        background: #92400e;
+        border-top-color: #b45309;
+      }
+
+      .ws-status-panel.ws-state-connected {
+        background: #166534;
+        border-top-color: #15803d;
+      }
+
+      .ws-status-panel.ws-state-disconnected {
+        background: #7c2d12;
+        border-top-color: #9a3412;
+      }
+
+      .ws-status-panel.ws-state-bridge-missing,
+      .ws-status-panel.ws-state-error {
+        background: #991b1b;
+        border-top-color: #b91c1c;
       }
 
       .sidebar {
@@ -505,11 +637,18 @@ export class App {
       .main-content {
         flex: 1;
         padding: 1rem;
-        overflow-y: auto;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
       }
 
       .cards-section {
         margin-bottom: 1rem;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
       }
 
       .search-container {
@@ -540,13 +679,18 @@ export class App {
 
       .cards-grid {
         display: grid;
-        gap: 1.5rem;
+        gap: 0.75rem;
+        overflow-y: auto;
+        flex: 1;
+        min-height: 0;
+        padding-right: 6px;
       }
 
       .cards-grid.two-cards {
-        grid-template-columns: repeat(2, 1fr);
-        max-width: 800px;
-        margin: 0 auto;
+        grid-template-columns: 1fr;
+        max-width: 100%;
+        margin: 0;
+        width: 100%;
       }
 
       .feature-card {
@@ -556,9 +700,9 @@ export class App {
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         transition: transform 0.3s ease, box-shadow 0.3s ease;
         cursor: pointer;
-        display: flex;
-        flex-direction: column;
-        min-height: 200px;
+        display: grid;
+        grid-template-columns: 88px 1fr;
+        min-height: 108px;
       }
 
       .feature-card:hover {
@@ -567,31 +711,35 @@ export class App {
       }
 
       .card-icon {
-        font-size: 3rem;
+        font-size: 2rem;
         text-align: center;
-        padding: 1.5rem;
+        padding: 1rem 0.75rem;
         background: linear-gradient(135deg, #f5f7fa 0%, #e4e7ec 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
 
       .card-content {
-        padding: 1.25rem;
+        padding: 0.75rem 1rem;
         flex: 1;
         display: flex;
         flex-direction: column;
+        justify-content: center;
       }
 
       .card-title {
-        font-size: 1.1rem;
+        font-size: 0.98rem;
         font-weight: 600;
-        margin-bottom: 0.5rem;
+        margin-bottom: 0.25rem;
         color: #1e293b;
       }
 
       .card-description {
-        font-size: 0.85rem;
+        font-size: 0.8rem;
         color: #64748b;
-        margin-bottom: 1rem;
-        line-height: 1.5;
+        margin-bottom: 0.5rem;
+        line-height: 1.35;
         flex: 1;
       }
 
@@ -731,6 +879,14 @@ export class App {
       homeBtn.addEventListener('click', () => this.hideAllWindows());
     }
 
+    const wsToggle = document.getElementById('ws-status-toggle');
+    if (wsToggle) {
+      wsToggle.addEventListener('click', () => {
+        this.wsPanelCollapsed = !this.wsPanelCollapsed;
+        this.updateWsStatusBar();
+      });
+    }
+
     // Close all button - attach via direct selector since it might be added dynamically
     document.addEventListener('click', (e) => {
       if ((e.target as HTMLElement).id === 'close-all-btn') {
@@ -861,6 +1017,188 @@ export class App {
   }
 
   private cleanupFunctions: any[] = [];
+
+  private resolveWsRuntimePort() {
+    const injected = Number(window.__WEBUI_WS_PORT__);
+    if (Number.isInteger(injected) && injected > 0 && injected <= 65535) {
+      this.wsRuntimePort = injected;
+      this.wsRuntimePortSource = 'injected';
+      return;
+    }
+
+    const locationPort = Number(window.location?.port);
+    if (Number.isInteger(locationPort) && locationPort > 0 && locationPort <= 65535) {
+      this.wsRuntimePort = locationPort;
+      this.wsRuntimePortSource = 'location';
+      return;
+    }
+
+    this.wsRuntimePort = null;
+    this.wsRuntimePortSource = 'unknown';
+  }
+
+  private updateWsStatusBar(reason?: string) {
+    const panel = document.getElementById('ws-status-panel');
+    const summaryEl = document.getElementById('ws-status-summary');
+    const detailsEl = document.getElementById('ws-status-details');
+    if (!panel || !summaryEl || !detailsEl) return;
+
+    const latest = this.wsStateHistory[this.wsStateHistory.length - 1];
+    const ts = latest?.at ? new Date(latest.at).toLocaleTimeString() : new Date().toLocaleTimeString();
+    const suffix = reason ? ` | ${reason}` : '';
+
+    panel.className = `ws-status-panel ws-state-${this.wsState.replace('_', '-')} ${this.wsPanelCollapsed ? 'ws-collapsed' : 'ws-expanded'}`;
+    summaryEl.textContent = `WS: ${this.wsState.toUpperCase()} | last=${ts}${suffix}`;
+
+    const recentHistory = this.wsStateHistory
+      .slice(-6)
+      .map((entry) => {
+        const t = new Date(entry.at).toLocaleTimeString();
+        return `- ${t} | ${entry.state}${entry.reason ? ` | ${entry.reason}` : ''}`;
+      })
+      .join('\n');
+
+    detailsEl.textContent =
+      `State: ${this.wsState}\n` +
+      `Reconnect attempts: ${this.wsReconnectAttempts}\n` +
+      `Lifecycle queue: ${this.lifecycleQueue.length}\n` +
+      `Runtime WS port: ${this.wsRuntimePort || 'n/a'} (${this.wsRuntimePortSource})\n` +
+      `Backend send ok/fail: ${this.wsBackendSendOk}/${this.wsBackendSendFail}\n` +
+      `Last backend ok: ${this.wsBackendLastOkAt || 'n/a'}\n` +
+      `Last heartbeat: ${this.wsLastHeartbeatAt || 'n/a'}\n` +
+      `Last error: ${this.wsLastError || 'none'}\n\n` +
+      `Recent transitions:\n${recentHistory || '- none'}`;
+  }
+
+  private reportWsStateToBackend(state: WsConnectionState, reason?: string) {
+    const payload = {
+      state,
+      reason: reason || '',
+      timestamp: new Date().toISOString(),
+      reconnect_attempts: this.wsReconnectAttempts,
+      ws_port: this.wsRuntimePort,
+      ws_port_source: this.wsRuntimePortSource,
+    };
+    const sent = this.callBackend('ws_state_change', payload);
+    if (!sent) {
+      this.Logger.warn('Failed to report ws_state_change to backend', payload);
+    }
+  }
+
+  private reportWsErrorToBackend(error: unknown, context: string) {
+    const payload = {
+      context,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack || '' : '',
+      timestamp: new Date().toISOString(),
+      ws_port: this.wsRuntimePort,
+      ws_port_source: this.wsRuntimePortSource,
+    };
+    const sent = this.callBackend('ws_error_report', payload);
+    if (!sent) {
+      this.Logger.warn('Failed to report ws_error_report to backend', payload);
+    }
+  }
+
+  private transitionWsState(state: WsConnectionState, reason?: string) {
+    if (this.wsState === state && !reason) return;
+    if (state === 'connected') {
+      this.wsLastError = '';
+    }
+    this.wsState = state;
+    this.wsStateHistory.push({ state, at: new Date().toISOString(), reason });
+    if (this.wsStateHistory.length > 200) {
+      this.wsStateHistory.shift();
+    }
+
+    this.Logger.info('WebSocket state transition', { state, reason, reconnectAttempts: this.wsReconnectAttempts });
+    this.updateWsStatusBar(reason);
+    this.reportWsStateToBackend(state, reason);
+  }
+
+  private setupConnectionMonitoring() {
+    this.transitionWsState('initializing', 'App mounted');
+    this.resolveWsRuntimePort();
+    this.Logger.info('Resolved WebUI runtime port', {
+      port: this.wsRuntimePort,
+      source: this.wsRuntimePortSource,
+      location: window.location.href,
+    });
+    this.updateWsStatusBar();
+
+    window.addEventListener('webui_runtime_port', (rawEvent: Event) => {
+      const event = rawEvent as CustomEvent<{ port?: number }>;
+      const candidate = Number(event.detail?.port);
+      if (Number.isInteger(candidate) && candidate > 0 && candidate <= 65535) {
+        this.wsRuntimePort = candidate;
+        this.wsRuntimePortSource = 'injected';
+        this.Logger.info('Updated WebUI runtime port from backend event', { port: candidate });
+        this.updateWsStatusBar('runtime port update');
+      }
+    });
+
+    if (!window.webui) {
+      this.transitionWsState('bridge_missing', 'window.webui not found');
+    } else {
+      this.transitionWsState('connected', 'webui bridge object detected');
+    }
+
+    if (window.webui?.setEventCallback && window.webui?.event) {
+      try {
+        window.webui.setEventCallback((evt: any) => {
+          const connectedValue = window.webui?.event?.CONNECTED;
+          const disconnectedValue = window.webui?.event?.DISCONNECTED;
+          if (evt === connectedValue) {
+            this.wsReconnectAttempts = 0;
+            this.transitionWsState('connected', 'webui CONNECTED event');
+          } else if (evt === disconnectedValue) {
+            this.wsReconnectAttempts += 1;
+            this.transitionWsState('disconnected', 'webui DISCONNECTED event');
+          } else {
+            this.Logger.debug('webui event callback', { evt });
+          }
+        });
+      } catch (error) {
+        this.transitionWsState('error', 'setEventCallback failed');
+        this.reportWsErrorToBackend(error, 'setEventCallback');
+      }
+    }
+
+    window.addEventListener('offline', () => {
+      this.wsReconnectAttempts += 1;
+      this.transitionWsState('reconnecting', 'Browser offline');
+    });
+    window.addEventListener('online', () => {
+      this.transitionWsState('connected', 'Browser online');
+    });
+
+    if (this.wsHeartbeatTimer !== null) {
+      window.clearInterval(this.wsHeartbeatTimer);
+    }
+    this.wsHeartbeatTimer = window.setInterval(() => {
+      const connectedByApi =
+        typeof window.webui?.isConnected === 'function' ? window.webui.isConnected() : !!window.webui;
+
+      if (!connectedByApi) {
+        this.wsReconnectAttempts += 1;
+        this.transitionWsState('reconnecting', 'Heartbeat indicates disconnected bridge');
+      } else if (this.wsState !== 'connected') {
+        this.transitionWsState('connected', 'Heartbeat recovered');
+      }
+
+      const heartbeatPayload = {
+        state: this.wsState,
+        connected: connectedByApi,
+        queued_lifecycle_events: this.lifecycleQueue.length,
+        timestamp: new Date().toISOString(),
+        ws_port: this.wsRuntimePort,
+        ws_port_source: this.wsRuntimePortSource,
+      };
+      this.callBackend('ws_heartbeat', heartbeatPayload);
+      this.wsLastHeartbeatAt = new Date().toLocaleTimeString();
+      this.updateWsStatusBar();
+    }, 1500);
+  }
 
   private generateSystemInfoHTML(): string {
     const now = new Date();
@@ -1559,46 +1897,147 @@ export class App {
     `;
   }
 
-  private openCalculatorWindow() {
-    this.openWindow('Calculator', this.generateCalculatorHTML(), '🧮');
-  }
-
-  private openTextEditorWindow() {
-    this.openWindow('Text Editor', this.generateTextEditorHTML(), '📝');
-  }
-
-  private openImageViewerWindow() {
-    this.openWindow('Image Viewer', this.generateImageViewerHTML(), '🖼️');
-  }
-
-  private openTerminalWindow() {
-    this.openWindow('Terminal', this.generateTerminalHTML(), '⌨️');
-  }
-
-  private waitForWinBox(retries: number = 10): Promise<any> {
-    return new Promise((resolve) => {
-      const check = (attempt: number) => {
-        if (window.WinBox) {
-          resolve(window.WinBox);
-        } else if (attempt < retries) {
-          setTimeout(() => check(attempt + 1), 100);
-        } else {
-          this.Logger.error('WinBox failed to load after retries');
-          resolve(null);
-        }
-      };
-      check(0);
-    });
-  }
-
-  private async openWindow(title: string, content: string, icon: string, options: any = {}) {
+  private async ensureWinBoxLoaded(): Promise<any> {
     if (!window.WinBox) {
-      this.Logger.warn('WinBox not ready, waiting...');
-      const WinBox = await this.waitForWinBox();
-      if (!WinBox) {
-        this.Logger.error('WinBox is not loaded. Please try again.');
-        return;
+      window.WinBox = WinBox;
+    }
+    return window.WinBox;
+  }
+
+  private startBackendBridge() {
+    this.flushLifecycleQueue();
+    if (this.lifecycleFlushTimer !== null) {
+      window.clearInterval(this.lifecycleFlushTimer);
+    }
+    this.lifecycleFlushTimer = window.setInterval(() => {
+      this.flushLifecycleQueue();
+    }, 1000);
+  }
+
+  private resolveBackendBinding(name: string): ((payload: string) => unknown) | null {
+    const candidates = new Set<string>([
+      name,
+      name.replace(/_([a-z])/g, (_, c) => c.toUpperCase()),
+      name.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`),
+    ]);
+
+    for (const candidate of candidates) {
+      const fn = (window as any)[candidate];
+      if (typeof fn === 'function') {
+        return fn as (payload: string) => unknown;
       }
+    }
+    return null;
+  }
+
+  private callBackend(name: string, payload: unknown): boolean {
+    const serialized = JSON.stringify(payload);
+    const binding = this.resolveBackendBinding(name);
+    if (binding) {
+      try {
+        binding(serialized);
+        this.wsBackendSendOk += 1;
+        this.wsBackendLastOkAt = new Date().toLocaleTimeString();
+        return true;
+      } catch (error) {
+        this.wsBackendSendFail += 1;
+        this.wsLastError = `${name}: ${(error as Error).message}`;
+        this.updateWsStatusBar();
+        this.Logger.error('Backend binding invocation failed', {
+          name,
+          error: (error as Error).message,
+          payload,
+        });
+      }
+    }
+
+    if (window.webui && typeof window.webui.call === 'function') {
+      window.webui
+        .call(name, serialized)
+        .then(() => {
+          this.wsBackendSendOk += 1;
+          this.wsBackendLastOkAt = new Date().toLocaleTimeString();
+          this.updateWsStatusBar();
+        })
+        .catch((error: Error) => {
+          this.wsBackendSendFail += 1;
+          this.wsLastError = `${name}: ${error.message}`;
+          this.updateWsStatusBar();
+          this.Logger.error('webui.call backend send failed', {
+            name,
+            error: error.message,
+            payload,
+          });
+        });
+      return true;
+    }
+
+    return false;
+  }
+
+  private sendLifecycleToBackend(payload: WindowLifecyclePayload): boolean {
+    return this.callBackend('log_window_lifecycle', payload);
+  }
+
+  private flushLifecycleQueue() {
+    if (this.lifecycleQueue.length === 0) return;
+
+    const pending = [...this.lifecycleQueue];
+    this.lifecycleQueue = [];
+    for (const payload of pending) {
+      if (!this.sendLifecycleToBackend(payload)) {
+        this.lifecycleQueue.push(payload);
+      }
+    }
+  }
+
+  private emitWindowLifecycle(state: WindowLifecycleState, windowInfo: Pick<WindowInfo, 'id' | 'title'>) {
+    const key = windowInfo.id;
+    const now = Date.now();
+    const last = this.lifecycleLastSent.get(key);
+    if (last && last.state === state && now - last.ts < 250) {
+      return;
+    }
+    this.lifecycleLastSent.set(key, { state, ts: now });
+
+    const payload: WindowLifecyclePayload = {
+      event: state,
+      window_id: windowInfo.id,
+      title: windowInfo.title,
+      timestamp: new Date().toISOString(),
+    };
+
+    this.Logger.info('Window lifecycle event', payload);
+    if (!this.sendLifecycleToBackend(payload)) {
+      this.lifecycleQueue.push(payload);
+      if (this.lifecycleQueue.length > 256) {
+        this.lifecycleQueue.shift();
+      }
+      this.Logger.debug('Lifecycle event queued until backend bridge is ready', {
+        queued: this.lifecycleQueue.length,
+      });
+    }
+  }
+
+  private emitFocusedLifecycle(windowInfo: Pick<WindowInfo, 'id' | 'title'>) {
+    const existing = this.lifecycleFocusTimers.get(windowInfo.id);
+    if (existing) {
+      window.clearTimeout(existing);
+    }
+    const timer = window.setTimeout(() => {
+      this.emitWindowLifecycle('active', windowInfo);
+      this.lifecycleFocusTimers.delete(windowInfo.id);
+    }, 120);
+    this.lifecycleFocusTimers.set(windowInfo.id, timer);
+  }
+
+  private async openWindow(title: string, content: string, _icon: string, options: any = {}) {
+    if (!window.WinBox) {
+      await this.ensureWinBoxLoaded();
+    }
+    if (!window.WinBox) {
+      this.Logger.error('WinBox is not loaded. Please try again.');
+      return;
     }
 
     const existingWindow = this.activeWindows.find(w => w.title === title);
@@ -1617,6 +2056,8 @@ export class App {
     const windowId = 'win-' + Date.now();
     let winboxInstance: any;
 
+    const app = this;
+
     // Default options
     const defaultOptions = {
       title: title,
@@ -1631,33 +2072,64 @@ export class App {
       max: true,
       min: true,
       mount: document.createElement('div'),
-      oncreate: function() {
+      oncreate: function(this: any) {
         this.body.innerHTML = content;
       },
       onminimize: () => {
         this.activeWindows = this.activeWindows.map(w =>
-          w.id === windowId ? { ...w, minimized: true } : w
+          w.id === windowId ? { ...w, minimized: true, active: false } : w
         );
+        this.emitWindowLifecycle('minimized', { id: windowId, title });
         this.updateWindowList();
       },
       onrestore: () => {
-        this.activeWindows = this.activeWindows.map(w =>
-          w.id === windowId ? { ...w, minimized: false, maximized: false } : w
-        );
+        this.activeWindows = this.activeWindows.map(w => ({
+          ...w,
+          minimized: w.id === windowId ? false : w.minimized,
+          maximized: w.id === windowId ? false : w.maximized,
+          active: w.id === windowId,
+        }));
+        this.emitWindowLifecycle('restored', { id: windowId, title });
         this.updateWindowList();
       },
-      onmaximize: () => {
+      onmaximize: function(this: any) {
         const availableWidth = window.innerWidth - 200;
         const availableHeight = window.innerHeight;
 
-        winboxInstance.resize(availableWidth, availableHeight);
-        winboxInstance.move(200, 0);
+        this.resize(availableWidth, availableHeight);
+        this.move(200, 0);
 
+        app.activeWindows = app.activeWindows.map(w => ({
+          ...w,
+          maximized: w.id === windowId,
+          active: w.id === windowId,
+          minimized: w.id === windowId ? false : w.minimized,
+        }));
+        app.emitFocusedLifecycle({ id: windowId, title });
+        app.updateWindowList();
+      },
+      onfocus: () => {
+        this.activeWindows = this.activeWindows.map(w => ({
+          ...w,
+          active: w.id === windowId,
+          minimized: w.id === windowId ? false : w.minimized,
+        }));
+        this.emitFocusedLifecycle({ id: windowId, title });
+        this.updateWindowList();
+      },
+      onblur: () => {
         this.activeWindows = this.activeWindows.map(w =>
-          w.id === windowId ? { ...w, maximized: true } : w
+          w.id === windowId ? { ...w, active: false } : w
         );
+        this.updateWindowList();
       },
       onclose: () => {
+        const timer = this.lifecycleFocusTimers.get(windowId);
+        if (timer) {
+          window.clearTimeout(timer);
+          this.lifecycleFocusTimers.delete(windowId);
+        }
+        this.emitWindowLifecycle('closed', { id: windowId, title });
         this.activeWindows = this.activeWindows.filter(w => w.id !== windowId);
         this.updateWindowList();
       }
@@ -1672,11 +2144,14 @@ export class App {
       id: windowId,
       title: title,
       minimized: false,
+      active: true,
       maximized: false,
       winboxInstance: winboxInstance
     };
 
+    this.activeWindows = this.activeWindows.map(w => ({ ...w, active: false }));
     this.activeWindows.push(windowInfo);
+    this.emitWindowLifecycle('opened', { id: windowId, title });
     this.updateWindowList();
   }
 
@@ -1739,8 +2214,15 @@ export class App {
         w.id === windowInfo.id ? { ...w, minimized: false } : w
       );
       this.updateWindowList();
+      // WinBox restore can be async; focus on next tick to make a single click reliable.
+      window.setTimeout(() => {
+        windowInfo.winboxInstance.focus();
+        this.emitWindowLifecycle('focused', { id: windowInfo.id, title: windowInfo.title });
+      }, 0);
+      return;
     }
     windowInfo.winboxInstance.focus();
+    this.emitWindowLifecycle('focused', { id: windowInfo.id, title: windowInfo.title });
   }
 
   private closeWindow(windowInfo: WindowInfo) {
@@ -1767,7 +2249,7 @@ export class App {
     
     this.activeWindows = this.activeWindows.map(w => {
       if (!w.minimized) {
-        return { ...w, minimized: true, maximized: false };
+        return { ...w, minimized: true, maximized: false, active: false };
       }
       return w;
     });

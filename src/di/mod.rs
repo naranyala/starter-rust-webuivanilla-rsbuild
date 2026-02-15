@@ -1,11 +1,15 @@
-// di/mod.rs
+// Canonical DI module.
+pub mod container;
+pub mod module;
+
 use std::sync::{Arc, Mutex};
-use crate::core::ports::repository::UserRepository;
-use crate::core::services::user_service::{UserService, UserServiceImpl};
+
+use crate::core::config::AppConfig;
+use crate::core::logging::StructuredLogger;
 use crate::core::ports::logger::LogLevel;
-use crate::infrastructure::config::AppConfig;
-use crate::infrastructure::logging::StructuredLogger;
-use crate::infrastructure::persistence::sqlite::user_repository::SqliteUserRepository;
+use crate::core::ports::repository::UserRepository;
+use crate::model::repositories::sqlite::user_repository::SqliteUserRepository;
+use crate::model::services::user_service::{UserService, UserServiceImpl};
 
 pub struct ServiceProvider {
     pub config: AppConfig,
@@ -16,15 +20,11 @@ pub struct ServiceProvider {
 
 impl ServiceProvider {
     pub fn new(config: AppConfig) -> Result<Self, Box<dyn std::error::Error>> {
-        // Initialize database connection
-        let conn = Arc::new(Mutex::new(rusqlite::Connection::open(
-            &config.database.path,
-        )?));
+        let conn = Arc::new(Mutex::new(rusqlite::Connection::open(&config.database.path)?));
 
-        // Create repository
-        let user_repository: Arc<dyn UserRepository> = Arc::new(SqliteUserRepository::new(conn.clone()));
+        let user_repository: Arc<dyn UserRepository> =
+            Arc::new(SqliteUserRepository::new(conn.clone()));
 
-        // Initialize schema
         {
             let repo = user_repository.clone();
             let runtime = tokio::runtime::Runtime::new()?;
@@ -32,20 +32,16 @@ impl ServiceProvider {
                 let _ = repo.get_all().await;
             });
         }
-        
-        // Actually initialize the schema
+
         let sqlite_repo = SqliteUserRepository::new(conn);
         sqlite_repo.init_schema()?;
 
-        // Create logger
         let log_level = LogLevel::from(config.logging.level.as_str());
         let mut logger = StructuredLogger::new(log_level, "app");
         logger.init(None)?;
 
-        // Create event bus (noop for now)
         let event_bus = Arc::new(NoopEventBus);
 
-        // Create services
         let user_service: Arc<dyn UserService> =
             Arc::new(UserServiceImpl::new(user_repository.clone(), event_bus));
 
@@ -58,14 +54,13 @@ impl ServiceProvider {
     }
 }
 
-// Simplified event bus for now
 struct NoopEventBus;
 
 impl crate::core::ports::event_bus::EventBus for NoopEventBus {
     fn publish(
         &self,
-        _event: Box<dyn crate::core::domain::events::DomainEvent>,
-    ) -> Result<(), crate::core::domain::errors::DomainError> {
+        _event: Box<dyn crate::model::entities::events::DomainEvent>,
+    ) -> Result<(), crate::model::entities::errors::DomainError> {
         Ok(())
     }
 }
