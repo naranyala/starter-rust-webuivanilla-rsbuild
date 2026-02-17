@@ -5,10 +5,12 @@
 use log::{error, info};
 use std::ffi::CStr;
 use std::net::TcpListener;
+use std::sync::Arc;
 use webui_rs::webui;
 
-mod application;
 mod core;
+mod features;
+mod plugins;
 mod di;
 mod infrastructure;
 mod model;
@@ -16,6 +18,9 @@ mod mvvm;
 mod platform;
 mod view;
 mod viewmodel;
+
+use plugins::{create_plugin_registry, PluginRegistry, Plugin};
+use features::user::UserPlugin;
 
 use mvvm::shared::config::AppConfig;
 use mvvm::shared::di::ServiceProvider;
@@ -83,6 +88,33 @@ fn main() {
 
     info!("Application starting: {} v{}", config.app.name, config.app.version);
     info!("Window title: {}", config.window.title);
+
+    info!("=== Backend-Frontend Communication Configuration ===");
+    info!("Transport Options:");
+    info!("  - WebUI (WebSocket over HTTP) [SELECTED]");
+    info!("  - WebRTC (peer-to-peer)");
+    info!("  - HTTP REST API");
+    info!("  - IPC (local)");
+    info!("Serialization Options:");
+    info!("  - JSON [SELECTED]");
+    info!("  - MessagePack");
+    info!("  - CBOR");
+    info!("  - Protocol Buffers (protobuf)");
+    info!("  - YAML");
+    info!("Selected: WebUI (transport) + JSON (serialization)");
+    info!("===================================================");
+
+    // Initialize plugin system
+    let plugin_registry = create_plugin_registry();
+    let user_plugin = Arc::new(UserPlugin::new());
+    
+    if let Err(e) = plugin_registry.register(user_plugin.clone() as Arc<dyn plugins::Plugin>) {
+        error!("Failed to register user plugin: {}", e);
+    } else {
+        info!("Plugin registered: {} v{}", user_plugin.name(), user_plugin.version());
+    }
+
+    info!("Plugin system initialized with {} plugins", plugin_registry.len());
 
     let _provider = match ServiceProvider::new(config.clone()) {
         Ok(p) => {

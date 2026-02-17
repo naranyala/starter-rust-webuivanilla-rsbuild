@@ -3,6 +3,14 @@
 
 import { errorModal } from './lib/error-modal';
 import WinBox from 'winbox/src/js/winbox.js';
+import {
+  generateSystemInfoHTML,
+  generateSQLiteHTML,
+  generateCalculatorHTML,
+  generateTextEditorHTML,
+  generateImageViewerHTML,
+  generateTerminalHTML,
+} from './app/components';
 
 interface WindowInfo {
   id: string;
@@ -1200,165 +1208,8 @@ export class App {
     }, 1500);
   }
 
-  private generateSystemInfoHTML(): string {
-    const now = new Date();
-    return `
-      <div style="padding: 20px; color: white; font-family: 'Segoe UI', sans-serif; max-height: 100%; overflow-y: auto;">
-        <h2 style="margin-bottom: 20px; color: #4f46e5;">💻 System Information</h2>
-
-        <div style="margin-bottom: 20px;">
-          <h3 style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 10px;">Operating System</h3>
-          <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-              <span style="color: #64748b;">Platform:</span>
-              <span>${navigator.platform}</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-              <span style="color: #64748b;">User Agent:</span>
-              <span style="font-size: 0.8rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${navigator.userAgent}</span>
-            </div>
-            <div style="display: flex; justify-content: space-between;">
-              <span style="color: #64748b;">Language:</span>
-              <span>${navigator.language}</span>
-            </div>
-          </div>
-        </div>
-
-        <div style="margin-bottom: 20px;">
-          <h3 style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 10px;">Display & Screen</h3>
-          <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-              <span style="color: #64748b;">Screen Resolution:</span>
-              <span>${screen.width} × ${screen.height}</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-              <span style="color: #64748b;">Available Resolution:</span>
-              <span>${screen.availWidth} × ${screen.availHeight}</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-              <span style="color: #64748b;">Color Depth:</span>
-              <span>${screen.colorDepth}-bit</span>
-            </div>
-            <div style="display: flex; justify-content: space-between;">
-              <span style="color: #64748b;">Pixel Ratio:</span>
-              <span>${window.devicePixelRatio}x</span>
-            </div>
-          </div>
-        </div>
-
-        <div style="margin-bottom: 20px;">
-          <h3 style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 10px;">Browser Information</h3>
-          <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-              <span style="color: #64748b;">Online Status:</span>
-              <span style="color: ${navigator.onLine ? '#10b981' : '#ef4444'}">${navigator.onLine ? '🟢 Online' : '🔴 Offline'}</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-              <span style="color: #64748b;">Cookies Enabled:</span>
-              <span>${navigator.cookieEnabled ? 'Yes' : 'No'}</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-              <span style="color: #64748b;">Cores:</span>
-              <span>${navigator.hardwareConcurrency || 'Unknown'}</span>
-            </div>
-            <div style="display: flex; justify-content: space-between;">
-              <span style="color: #64748b;">Memory:</span>
-              <span>${navigator.deviceMemory || 'Unknown'} GB</span>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <h3 style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 10px;">Current Time</h3>
-          <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-              <span style="color: #64748b;">Local Time:</span>
-              <span>${now.toLocaleString()}</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-              <span style="color: #64748b;">Timezone:</span>
-              <span>${Intl.DateTimeFormat().resolvedOptions().timeZone}</span>
-            </div>
-            <div style="display: flex; justify-content: space-between;">
-              <span style="color: #64748b;">Timezone Offset:</span>
-              <span>UTC${now.getTimezoneOffset() > 0 ? '-' : '+'}${Math.abs(now.getTimezoneOffset() / 60)}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  private generateSQLiteHTML(): string {
-    const users = this.dbUsers.length > 0 ? this.dbUsers : [
-      { id: 1, name: 'John Doe', email: 'john@example.com', role: 'Admin', status: 'Active', created_at: '' },
-      { id: 2, name: 'Jane Smith', email: 'jane@example.com', role: 'User', status: 'Active', created_at: '' },
-      { id: 3, name: 'Bob Johnson', email: 'bob@example.com', role: 'User', status: 'Inactive', created_at: '' },
-      { id: 4, name: 'Alice Brown', email: 'alice@example.com', role: 'Editor', status: 'Active', created_at: '' },
-      { id: 5, name: 'Charlie Wilson', email: 'charlie@example.com', role: 'User', status: 'Pending', created_at: '' },
-    ];
-
-    const rows = users.map((row: User) => `
-      <tr style="border-bottom: 1px solid #334155;">
-        <td style="padding: 10px; color: #e2e8f0;">${row.id}</td>
-        <td style="padding: 10px; color: #e2e8f0;">${row.name}</td>
-        <td style="padding: 10px; color: #94a3b8;">${row.email}</td>
-        <td style="padding: 10px;"><span style="background: ${row.role === 'Admin' ? '#dc2626' : row.role === 'Editor' ? '#f59e0b' : '#3b82f6'}; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">${row.role}</span></td>
-        <td style="padding: 10px;"><span style="color: ${row.status === 'Active' ? '#10b981' : row.status === 'Inactive' ? '#ef4444' : '#f59e0b'}">● ${row.status}</span></td>
-      </tr>
-    `).join('');
-
-    return `
-      <div style="padding: 20px; color: white; font-family: 'Segoe UI', sans-serif; height: 100%; display: flex; flex-direction: column;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-          <h2 style="color: #4f46e5;">🗄️ SQLite Database Viewer</h2>
-          <span style="background: #10b981; padding: 5px 12px; border-radius: 20px; font-size: 0.8rem;">Live Data</span>
-        </div>
-
-        <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-          <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-            <input type="text" id="db-search" placeholder="Search records..." style="flex: 1; padding: 8px 12px; background: rgba(0,0,0,0.3); border: 1px solid #334155; border-radius: 6px; color: white; font-size: 0.9rem;">
-            <button onclick="window.searchUsers && window.searchUsers()" style="padding: 8px 16px; background: #4f46e5; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Search</button>
-            <button onclick="window.refreshUsers && window.refreshUsers()" style="padding: 8px 16px; background: #f59e0b; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">↻</button>
-          </div>
-
-          <div style="display: flex; gap: 15px; font-size: 0.8rem; color: #94a3b8;">
-            <span>📊 Table: <strong style="color: white;">users</strong></span>
-            <span>📋 Records: <strong style="color: white;">${users.length}</strong></span>
-            <span>💾 Source: <strong style="color: white;">Rust SQLite</strong></span>
-          </div>
-        </div>
-
-        <div style="flex: 1; overflow: auto; background: rgba(0,0,0,0.2); border-radius: 8px;">
-          <table style="width: 100%; border-collapse: collapse;">
-            <thead style="background: rgba(255,255,255,0.1); position: sticky; top: 0;">
-              <tr>
-                <th style="padding: 12px 10px; text-align: left; color: #94a3b8; font-weight: 600; font-size: 0.85rem;">ID</th>
-                <th style="padding: 12px 10px; text-align: left; color: #94a3b8; font-weight: 600; font-size: 0.85rem;">Name</th>
-                <th style="padding: 12px 10px; text-align: left; color: #94a3b8; font-weight: 600; font-size: 0.85rem;">Email</th>
-                <th style="padding: 12px 10px; text-align: left; color: #94a3b8; font-weight: 600; font-size: 0.85rem;">Role</th>
-                <th style="padding: 12px 10px; text-align: left; color: #94a3b8; font-weight: 600; font-size: 0.85rem;">Status</th>
-              </tr>
-            </thead>
-            <tbody id="users-table-body">
-              ${rows}
-            </tbody>
-          </table>
-        </div>
-
-        <div style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
-          <span style="color: #64748b; font-size: 0.8rem;">Showing ${users.length} record${users.length !== 1 ? 's' : ''}</span>
-          <div style="display: flex; gap: 5px;">
-            <button style="padding: 5px 12px; background: rgba(255,255,255,0.1); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;" disabled>Previous</button>
-            <button style="padding: 5px 12px; background: rgba(255,255,255,0.1); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;" disabled>Next</button>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
   private openSystemInfoWindow() {
-    this.openWindow('System Information', this.generateSystemInfoHTML(), '💻');
+    this.openWindow('System Information', generateSystemInfoHTML(), '💻');
   }
 
   private openSQLiteWindow() {
@@ -1377,7 +1228,7 @@ export class App {
       window.getDbStats();
     }
 
-    this.openWindow('SQLite Database', this.generateSQLiteHTML(), '🗄️');
+    this.openWindow('SQLite Database', generateSQLiteHTML(), '🗄️');
   }
 
   private updateSQLiteTable() {
@@ -1427,474 +1278,6 @@ export class App {
 
       tableBody.appendChild(tr);
     }
-  }
-
-  private generateCalculatorHTML(): string {
-    return `
-      <div style="padding: 20px; color: white; font-family: 'Segoe UI', sans-serif; height: 100%; display: flex; flex-direction: column; background: #1e293b;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-          <h2 style="color: #4f46e5;">🧮 Calculator</h2>
-        </div>
-
-        <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-          <input type="text" id="calculator-display" readonly style="width: 100%; padding: 15px; font-size: 1.5rem; text-align: right; background: #0f172a; color: white; border: 1px solid #334155; border-radius: 6px; box-sizing: border-box;">
-        </div>
-
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; flex: 1;">
-          <button onclick="calculatorClear()" style="grid-column: span 2; padding: 15px; background: #dc2626; color: white; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer;">AC</button>
-          <button onclick="calculatorDelete()" style="padding: 15px; background: #f59e0b; color: white; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer;">DEL</button>
-          <button onclick="calculatorAppend('/')" style="padding: 15px; background: #4f46e5; color: white; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer;">÷</button>
-
-          <button onclick="calculatorAppend('7')" style="padding: 15px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; font-size: 1rem; cursor: pointer;">7</button>
-          <button onclick="calculatorAppend('8')" style="padding: 15px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; font-size: 1rem; cursor: pointer;">8</button>
-          <button onclick="calculatorAppend('9')" style="padding: 15px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; font-size: 1rem; cursor: pointer;">9</button>
-          <button onclick="calculatorAppend('*')" style="padding: 15px; background: #4f46e5; color: white; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer;">×</button>
-
-          <button onclick="calculatorAppend('4')" style="padding: 15px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; font-size: 1rem; cursor: pointer;">4</button>
-          <button onclick="calculatorAppend('5')" style="padding: 15px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; font-size: 1rem; cursor: pointer;">5</button>
-          <button onclick="calculatorAppend('6')" style="padding: 15px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; font-size: 1rem; cursor: pointer;">6</button>
-          <button onclick="calculatorAppend('-')" style="padding: 15px; background: #4f46e5; color: white; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer;">-</button>
-
-          <button onclick="calculatorAppend('1')" style="padding: 15px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; font-size: 1rem; cursor: pointer;">1</button>
-          <button onclick="calculatorAppend('2')" style="padding: 15px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; font-size: 1rem; cursor: pointer;">2</button>
-          <button onclick="calculatorAppend('3')" style="padding: 15px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; font-size: 1rem; cursor: pointer;">3</button>
-          <button onclick="calculatorAppend('+')" style="padding: 15px; background: #4f46e5; color: white; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer;">+</button>
-
-          <button onclick="calculatorAppend('0')" style="grid-column: span 2; padding: 15px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; font-size: 1rem; cursor: pointer;">0</button>
-          <button onclick="calculatorAppend('.')" style="padding: 15px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; font-size: 1rem; cursor: pointer;">.</button>
-          <button onclick="calculatorCalculate()" style="padding: 15px; background: #10b981; color: white; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer;">=</button>
-        </div>
-
-        <script>
-          let calculatorDisplay = document.getElementById('calculator-display');
-          let currentInput = '0';
-          let previousInput = '';
-          let operation = null;
-          let shouldResetDisplay = false;
-
-          function updateDisplay() {
-            calculatorDisplay.value = currentInput;
-          }
-
-          function calculatorAppend(value) {
-            if (shouldResetDisplay) {
-              currentInput = '';
-              shouldResetDisplay = false;
-            }
-            
-            if (currentInput === '0' && value !== '.') {
-              currentInput = value;
-            } else {
-              currentInput += value;
-            }
-            
-            updateDisplay();
-          }
-
-          function calculatorClear() {
-            currentInput = '0';
-            previousInput = '';
-            operation = null;
-            shouldResetDisplay = false;
-            updateDisplay();
-          }
-
-          function calculatorDelete() {
-            if (currentInput.length === 1) {
-              currentInput = '0';
-            } else {
-              currentInput = currentInput.slice(0, -1);
-            }
-            updateDisplay();
-          }
-
-          function calculatorCalculate() {
-            if (operation === null || shouldResetDisplay) return;
-
-            let result;
-            const prev = parseFloat(previousInput);
-            const current = parseFloat(currentInput);
-
-            if (isNaN(prev) || isNaN(current)) return;
-
-            switch (operation) {
-              case '+':
-                result = prev + current;
-                break;
-              case '-':
-                result = prev - current;
-                break;
-              case '*':
-                result = prev * current;
-                break;
-              case '/':
-                result = prev / current;
-                break;
-              default:
-                return;
-            }
-
-            currentInput = result.toString();
-            operation = null;
-            previousInput = '';
-            shouldResetDisplay = true;
-            updateDisplay();
-          }
-
-          function calculatorSetOperation(op) {
-            if (operation !== null) calculatorCalculate();
-            
-            operation = op;
-            previousInput = currentInput;
-            shouldResetDisplay = true;
-          }
-
-          // Attach functions to window so they can be called from HTML
-          window.calculatorAppend = calculatorAppend;
-          window.calculatorClear = calculatorClear;
-          window.calculatorDelete = calculatorDelete;
-          window.calculatorCalculate = calculatorCalculate;
-          window.calculatorSetOperation = calculatorSetOperation;
-
-          // Initialize display
-          updateDisplay();
-        </script>
-      </div>
-    `;
-  }
-
-  private generateTextEditorHTML(): string {
-    return `
-      <div style="padding: 20px; color: white; font-family: 'Segoe UI', sans-serif; height: 100%; display: flex; flex-direction: column; background: #1e293b;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-          <h2 style="color: #4f46e5;">📝 Text Editor</h2>
-          <div style="display: flex; gap: 10px;">
-            <button onclick="textEditorSave()" style="padding: 8px 16px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Save</button>
-            <button onclick="textEditorLoad()" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Load</button>
-          </div>
-        </div>
-
-        <textarea id="text-editor-content" style="flex: 1; width: 100%; padding: 15px; background: #0f172a; color: white; border: 1px solid #334155; border-radius: 8px; resize: none; font-family: monospace; font-size: 1rem; box-sizing: border-box;"></textarea>
-
-        <div style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center;">
-          <div style="color: #94a3b8; font-size: 0.8rem;">
-            <span id="cursor-position">Line: 1, Column: 1</span>
-          </div>
-          <div style="display: flex; gap: 10px;">
-            <button onclick="textEditorUndo()" style="padding: 6px 12px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; cursor: pointer; font-size: 0.8rem;">Undo</button>
-            <button onclick="textEditorRedo()" style="padding: 6px 12px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; cursor: pointer; font-size: 0.8rem;">Redo</button>
-          </div>
-        </div>
-
-        <script>
-          let textEditorContent = document.getElementById('text-editor-content');
-          let undoStack = [];
-          let redoStack = [];
-
-          function saveState() {
-            undoStack.push(textEditorContent.value);
-            if (undoStack.length > 50) undoStack.shift(); // Limit stack size
-            redoStack = []; // Clear redo stack when new action is performed
-          }
-
-          function updateCursorPosition() {
-            const textarea = textEditorContent;
-            const text = textarea.value.substring(0, textarea.selectionStart);
-            const lines = text.split('\\n');
-            const line = lines.length;
-            const column = lines[lines.length - 1].length + 1;
-            document.getElementById('cursor-position').textContent = \`Line: \${line}, Column: \${column}\`;
-          }
-
-          function textEditorSave() {
-            const content = textEditorContent.value;
-            const blob = new Blob([content], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'document.txt';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-          }
-
-          function textEditorLoad() {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = '.txt,.js,.ts,.html,.css,.json,.md';
-            
-            input.onchange = e => {
-              const file = e.target.files[0];
-              const reader = new FileReader();
-              
-              reader.onload = function(e) {
-                textEditorContent.value = e.target.result;
-                saveState();
-                updateCursorPosition();
-              };
-              
-              reader.readAsText(file);
-            };
-            
-            input.click();
-          }
-
-          function textEditorUndo() {
-            if (undoStack.length > 0) {
-              redoStack.push(textEditorContent.value);
-              textEditorContent.value = undoStack.pop();
-            }
-          }
-
-          function textEditorRedo() {
-            if (redoStack.length > 0) {
-              undoStack.push(textEditorContent.value);
-              textEditorContent.value = redoStack.pop();
-            }
-          }
-
-          // Event listeners
-          textEditorContent.addEventListener('input', saveState);
-          textEditorContent.addEventListener('keyup', updateCursorPosition);
-          textEditorContent.addEventListener('click', updateCursorPosition);
-          textEditorContent.addEventListener('mousemove', updateCursorPosition);
-
-          // Initialize
-          saveState();
-          updateCursorPosition();
-
-          // Attach functions to window
-          window.textEditorSave = textEditorSave;
-          window.textEditorLoad = textEditorLoad;
-          window.textEditorUndo = textEditorUndo;
-          window.textEditorRedo = textEditorRedo;
-        </script>
-      </div>
-    `;
-  }
-
-  private generateImageViewerHTML(): string {
-    return `
-      <div style="padding: 20px; color: white; font-family: 'Segoe UI', sans-serif; height: 100%; display: flex; flex-direction: column; background: #1e293b;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-          <h2 style="color: #4f46e5;">🖼️ Image Viewer</h2>
-          <div style="display: flex; gap: 10px;">
-            <button onclick="imageViewerZoomIn()" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Zoom In</button>
-            <button onclick="imageViewerZoomOut()" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Zoom Out</button>
-            <button onclick="imageViewerReset()" style="padding: 8px 16px; background: #f59e0b; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Reset</button>
-          </div>
-        </div>
-
-        <div style="flex: 1; display: flex; justify-content: center; align-items: center; background: #0f172a; border-radius: 8px; overflow: hidden; position: relative;">
-          <img id="image-viewer-img" src="https://placehold.co/600x400/1e293b/94a3b8?text=Select+an+Image+to+View" alt="Image Preview" style="max-width: 100%; max-height: 100%; object-fit: contain; transition: transform 0.2s ease;">
-        </div>
-
-        <div style="margin-top: 15px; display: flex; gap: 10px;">
-          <input type="file" id="image-upload" accept="image/*" style="display: none;" onchange="imageViewerHandleUpload()">
-          <button onclick="document.getElementById('image-upload').click()" style="flex: 1; padding: 10px; background: #8b5cf6; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Select Image</button>
-          <button onclick="imageViewerPrev()" style="padding: 10px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">← Prev</button>
-          <button onclick="imageViewerNext()" style="padding: 10px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #334155; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Next →</button>
-        </div>
-
-        <script>
-          let imageView = document.getElementById('image-viewer-img');
-          let scale = 1;
-          let currentImageIndex = 0;
-          
-          // Sample images for demo
-          const sampleImages = [
-            'https://placehold.co/600x400/1e293b/94a3b8?text=Sample+Image+1',
-            'https://placehold.co/600x400/0f172a/4f46e5?text=Sample+Image+2',
-            'https://placehold.co/600x400/1e293b/f59e0b?text=Sample+Image+3',
-            'https://placehold.co/600x400/0f172a/10b981?text=Sample+Image+4'
-          ];
-
-          function imageViewerZoomIn() {
-            scale = Math.min(scale + 0.2, 3);
-            imageView.style.transform = \`scale(\${scale})\`;
-          }
-
-          function imageViewerZoomOut() {
-            scale = Math.max(scale - 0.2, 0.2);
-            imageView.style.transform = \`scale(\${scale})\`;
-          }
-
-          function imageViewerReset() {
-            scale = 1;
-            imageView.style.transform = 'scale(1)';
-          }
-
-          function imageViewerHandleUpload() {
-            const input = document.getElementById('image-upload');
-            const file = input.files[0];
-            
-            if (file) {
-              const reader = new FileReader();
-              reader.onload = function(e) {
-                imageView.src = e.target.result;
-                scale = 1;
-                imageView.style.transform = 'scale(1)';
-              };
-              reader.readAsDataURL(file);
-            }
-          }
-
-          function imageViewerPrev() {
-            currentImageIndex = (currentImageIndex - 1 + sampleImages.length) % sampleImages.length;
-            imageView.src = sampleImages[currentImageIndex];
-            scale = 1;
-            imageView.style.transform = 'scale(1)';
-          }
-
-          function imageViewerNext() {
-            currentImageIndex = (currentImageIndex + 1) % sampleImages.length;
-            imageView.src = sampleImages[currentImageIndex];
-            scale = 1;
-            imageView.style.transform = 'scale(1)';
-          }
-
-          // Attach functions to window
-          window.imageViewerZoomIn = imageViewerZoomIn;
-          window.imageViewerZoomOut = imageViewerZoomOut;
-          window.imageViewerReset = imageViewerReset;
-          window.imageViewerHandleUpload = imageViewerHandleUpload;
-          window.imageViewerPrev = imageViewerPrev;
-          window.imageViewerNext = imageViewerNext;
-        </script>
-      </div>
-    `;
-  }
-
-  private generateTerminalHTML(): string {
-    return `
-      <div style="padding: 20px; color: white; font-family: 'Courier New', monospace; height: 100%; display: flex; flex-direction: column; background: #0f172a;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-          <h2 style="color: #4f46e5;">⌨️ Terminal Emulator</h2>
-          <div style="display: flex; gap: 10px;">
-            <button onclick="terminalClear()" style="padding: 8px 16px; background: #dc2626; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Clear</button>
-            <button onclick="terminalReset()" style="padding: 8px 16px; background: #f59e0b; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Reset</button>
-          </div>
-        </div>
-
-        <div id="terminal-output" style="flex: 1; background: #000; color: #00ff00; padding: 15px; border-radius: 8px; overflow-y: auto; font-size: 0.9rem; white-space: pre-wrap; margin-bottom: 10px; height: calc(100% - 80px);">
-          <div>Welcome to Terminal Emulator v1.0</div>
-          <div>Type 'help' for available commands</div>
-          <div style="color: #94a3b8;">$ Ready...</div>
-        </div>
-
-        <div style="display: flex; gap: 10px;">
-          <span style="color: #94a3b8;">$</span>
-          <input type="text" id="terminal-input" style="flex: 1; background: #000; color: #00ff00; border: 1px solid #334155; border-radius: 4px; padding: 8px; font-family: 'Courier New', monospace;" placeholder="Enter command...">
-          <button onclick="terminalExecute()" style="padding: 8px 16px; background: #4f46e5; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Run</button>
-        </div>
-
-        <script>
-          let terminalOutput = document.getElementById('terminal-output');
-          let terminalInput = document.getElementById('terminal-input');
-          let commandHistory = [];
-          let historyIndex = -1;
-
-          function terminalPrint(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            terminalOutput.appendChild(div);
-            terminalOutput.scrollTop = terminalOutput.scrollHeight;
-          }
-
-          function terminalExecute() {
-            const command = terminalInput.value.trim();
-            if (!command) return;
-
-            terminalPrint('$ ' + command);
-            commandHistory.push(command);
-            historyIndex = commandHistory.length;
-
-            // Process command
-            const cmd = command.toLowerCase();
-            if (cmd === 'help') {
-              terminalPrint('Available commands:');
-              terminalPrint('  help - Show this help message');
-              terminalPrint('  clear - Clear the terminal');
-              terminalPrint('  echo [text] - Print text to terminal');
-              terminalPrint('  date - Show current date and time');
-              terminalPrint('  whoami - Show current user');
-              terminalPrint('  pwd - Show current directory');
-              terminalPrint('  ls - List directory contents');
-            } else if (cmd === 'clear') {
-              terminalClear();
-              return;
-            } else if (cmd === 'date') {
-              terminalPrint(new Date().toString());
-            } else if (cmd === 'whoami') {
-              terminalPrint('user@rust-webui:~$');
-            } else if (cmd === 'pwd') {
-              terminalPrint('/home/user');
-            } else if (cmd === 'ls') {
-              terminalPrint('Documents\\tDownloads\\tPictures\\tMusic\\tVideos');
-            } else if (cmd.startsWith('echo ')) {
-              terminalPrint(command.substring(5));
-            } else {
-              terminalPrint('Command not found: ' + command + '. Type "help" for available commands.');
-            }
-
-            terminalInput.value = '';
-          }
-
-          function terminalClear() {
-            terminalOutput.innerHTML = '';
-            terminalPrint('Terminal cleared');
-            terminalPrint('Type "help" for available commands');
-          }
-
-          function terminalReset() {
-            terminalOutput.innerHTML = '';
-            terminalPrint('Welcome to Terminal Emulator v1.0');
-            terminalPrint('Type "help" for available commands');
-            terminalPrint('$ Ready...');
-            commandHistory = [];
-            historyIndex = -1;
-          }
-
-          // Handle keyboard events
-          terminalInput.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-              terminalExecute();
-            } else if (e.key === 'ArrowUp') {
-              e.preventDefault();
-              if (commandHistory.length > 0) {
-                if (historyIndex <= 0) historyIndex = commandHistory.length;
-                historyIndex--;
-                terminalInput.value = commandHistory[historyIndex];
-              }
-            } else if (e.key === 'ArrowDown') {
-              e.preventDefault();
-              if (historyIndex >= commandHistory.length - 1) {
-                historyIndex = commandHistory.length;
-                terminalInput.value = '';
-              } else {
-                historyIndex++;
-                if (historyIndex < commandHistory.length) {
-                  terminalInput.value = commandHistory[historyIndex];
-                } else {
-                  terminalInput.value = '';
-                }
-              }
-            }
-          });
-
-          // Focus input on click anywhere in terminal
-          terminalOutput.addEventListener('click', function() {
-            terminalInput.focus();
-          });
-
-          // Attach functions to window
-          window.terminalExecute = terminalExecute;
-          window.terminalClear = terminalClear;
-          window.terminalReset = terminalReset;
-        </script>
-      </div>
-    `;
   }
 
   private async ensureWinBoxLoaded(): Promise<any> {
@@ -2156,7 +1539,7 @@ export class App {
   }
 
   private openCalculatorWindow() {
-    this.openWindow('Calculator', this.generateCalculatorHTML(), '🧮', {
+    this.openWindow('Calculator', generateCalculatorHTML(), '🧮', {
       width: '400px',
       height: '500px',
       x: 'center',
@@ -2169,7 +1552,7 @@ export class App {
   }
 
   private openTextEditorWindow() {
-    this.openWindow('Text Editor', this.generateTextEditorHTML(), '📝', {
+    this.openWindow('Text Editor', generateTextEditorHTML(), '📝', {
       width: '800px',
       height: '600px',
       x: 'center',
@@ -2182,7 +1565,7 @@ export class App {
   }
 
   private openImageViewerWindow() {
-    this.openWindow('Image Viewer', this.generateImageViewerHTML(), '🖼️', {
+    this.openWindow('Image Viewer', generateImageViewerHTML(), '🖼️', {
       width: '800px',
       height: '600px',
       x: 'center',
@@ -2195,7 +1578,7 @@ export class App {
   }
 
   private openTerminalWindow() {
-    this.openWindow('Terminal', this.generateTerminalHTML(), '⌨️', {
+    this.openWindow('Terminal', generateTerminalHTML(), '⌨️', {
       width: '800px',
       height: '500px',
       x: 'center',

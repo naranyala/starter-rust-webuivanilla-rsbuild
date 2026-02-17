@@ -3,6 +3,7 @@ import 'winbox/dist/css/winbox.min.css';
 // Import the App class
 import { App } from './mvvm/view';
 import { logger, consoleX, LogLevel, errorModal, setContentSecurityPolicy } from './mvvm/shared';
+import { initializePlugins } from './app';
 
 // Configure CSP in production
 if (!import.meta.env.DEV) {
@@ -46,8 +47,12 @@ try {
   });
 }
 
-function initializeApp() {
+async function initializeApp() {
   consoleX.step('Initializing application');
+  
+  // Initialize plugin system first
+  await initializePlugins();
+  consoleX.success('Plugin system initialized');
   
   const rootElement = document.getElementById('app');
   
